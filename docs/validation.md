@@ -13,7 +13,7 @@
 | companion 실제 HTTP 시작·모델 목록·OAuth 상태 | 통과 | 로컬 서버 요청과 공식 CLI의 ChatGPT 로그인 상태 조회 |
 | 실제 OAuth 모델 해설 | **차단** | 공식 Codex CLI가 플랫폼의 읽기 전용 Codex 홈에서 `Read-only file system`으로 초기화 실패. 실제 모델 응답을 검증했다고 주장하지 않음 |
 | 네이티브 화면 터치·시스템 테마 | 통과 | e2-e4 착수 후 Stockfish의 e7-e5 응수, 백 차례 복귀, 시스템 라이트/다크 전환, 직접 대국의 기록 화면 표시 |
-| GitHub Actions 실행 | 미실행 | workflow를 추가했고 같은 빌드 명령은 클라우드에서 실행. GitHub의 실제 실행 결과는 push 후 확인 필요 |
+| GitHub Actions 실행 | SDK 초기화 수정 | 최초 실행은 Android toolchain 단계에서 exit 127로 실패. SDK 설치 액션도 실패하여 체크섬을 고정한 자체 installer로 교체. 새 SDK 디렉터리 설치와 Android 빌드를 클라우드에서 재검증. 최신 GitHub 실행·artifact 결과는 저장소 Actions에서 확인 |
 
 Android lint는 오류 0개, 경고 16개로 종료했습니다. 주로 한국어 UI 문자열의 번역 리소스화, 아이콘 구성 및 backup 설정 관련 경고입니다. 검사를 비활성화하거나 lint baseline으로 실패를 숨기지 않았습니다. Windows용 원본 Gradle wrapper는 CRLF를 유지하고 Stockfish 원본의 공백도 변경하지 않았습니다.
 

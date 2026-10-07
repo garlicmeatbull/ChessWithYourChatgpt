@@ -27,7 +27,7 @@ bash scripts/build-stockfish.sh
 
 `build-stockfish.sh`는 SHA-256이 고정된 공식 Stockfish 릴리스에서 NNUE를 복원하고 ARM64 NEON 및 x86_64 SSE2 실행 파일을 소스로 빌드합니다. 전체 NNUE가 실행 파일에 포함되었는지도 검사합니다. 두 ABI 모두 API 26 및 16KB ELF 페이지 정렬로 빌드합니다. 큰 NNUE가 포함되므로 APK 크기와 최초 빌드 시간이 큽니다.
 
-GitHub에 push하면 `Native Android` Actions가 APK와 대응 소스를 같은 다운로드 artifact로 만들도록 설정했습니다. 이 클라우드에서는 workflow 자체를 실행하지 않았으므로 GitHub 실행 결과는 별도로 확인하세요.
+GitHub에 push하면 `Native Android` Actions가 APK와 대응 소스를 같은 다운로드 artifact로 만들도록 설정했습니다. 성공한 실행의 `ChessCoach-Android-and-source` artifact에서 APK와 대응 소스를 함께 받을 수 있습니다. 빌드 상태는 저장소의 Actions에서 확인하세요.
 
 설치 가능한 개발 APK: `app/build/outputs/apk/debug/app-debug.apk`. `adb install -r` 또는 Android Studio로 설치합니다. `assembleRelease`도 지원하지만 실제 배포에는 **본인이 보관하는 릴리스 서명 키**가 필요합니다. 개발용 서명 키는 저장소에 넣지 않습니다.
 

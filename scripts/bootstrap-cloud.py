@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Pinned Linux x86_64 toolchains, installed outside the checkout; TLS + SHA256."""
 import hashlib
+import os
 from pathlib import Path
 import shutil
 import stat
@@ -9,7 +10,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-tools = Path('/workspace/toolchains')
+tools = Path(os.environ.get('CHESS_TOOLCHAIN_DIR', '/workspace/toolchains'))
 downloads = tools / 'downloads'
 downloads.mkdir(parents=True, exist_ok=True)
 

@@ -10,22 +10,23 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      CHESS_TOOLCHAIN_DIR: /tmp/chess-toolchains
+      ANDROID_HOME: /tmp/chess-toolchains/android-sdk
+      ANDROID_SDK_ROOT: /tmp/chess-toolchains/android-sdk
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: companion/package-lock.json
       - name: Android toolchain
-        run: |
-          sdkmanager --version
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+        run: python3 scripts/bootstrap-cloud.py
       - name: Dependencies and native engines
         run: |
           npm ci --prefix companion
