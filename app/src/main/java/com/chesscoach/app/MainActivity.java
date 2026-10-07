@@ -10,8 +10,8 @@ import java.util.concurrent.*;
 
 /** Native play screen: pinned advice, live model picker, board-first visual feedback. */
 public final class MainActivity extends Activity {
-    private Chess game=new Chess();private Stockfish engine,opponent;
-    private final ExecutorService engineJobs=Executors.newSingleThreadExecutor(),coachJobs=Executors.newSingleThreadExecutor();
+    private Chess game=new Chess();private volatile Stockfish engine,opponent;
+    private final ExecutorService engineJobs=EngineWork.queue(),coachJobs=Executors.newSingleThreadExecutor();
     private final List<String> moves=new ArrayList<>(),fens=new ArrayList<>();
     private final Map<String,Integer> repetitions=new HashMap<>();private final List<Integer> trend=new ArrayList<>();private final List<Feedback> feedback=new ArrayList<>();
     private volatile int generation=0;private volatile boolean destroyed=false,parked=false;
@@ -96,5 +96,5 @@ public final class MainActivity extends Activity {
     private void closeEngines(){if(engine!=null)engine.close();if(opponent!=null)opponent.close();engine=null;opponent=null;}
     @Override protected void onStart(){super.onStart();if(parked){parked=false;connectEngine();}if(modelChip!=null){renderFeedback();if(focus>=0)requestExplanation(feedback.get(focus),generation);}}
     @Override protected void onStop(){parked=true;super.onStop();if(!destroyed)engineJobs.submit(()->{if(parked)closeEngines();});}
-    @Override protected void onDestroy(){destroyed=true;generation++;engineJobs.shutdownNow();coachJobs.shutdownNow();closeEngines();super.onDestroy();}
+    @Override protected void onDestroy(){destroyed=true;generation++;engineJobs.shutdownNow();coachJobs.shutdownNow();EngineWork.close(this::closeEngines);super.onDestroy();}
 }

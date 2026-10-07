@@ -15,7 +15,7 @@ import java.util.concurrent.*;
 
 /** Same viewer and persistent analysis for games played in-app and imported PGN. */
 public final class ReviewActivity extends Activity {
-    private final ExecutorService engineJobs=Executors.newSingleThreadExecutor(),coachJobs=Executors.newSingleThreadExecutor();
+    private final ExecutorService engineJobs=EngineWork.queue(),coachJobs=Executors.newSingleThreadExecutor();
     private volatile boolean destroyed=false,cancel=false;
     private volatile Stockfish engine;
     private volatile boolean analyzing=false;
@@ -127,5 +127,5 @@ public final class ReviewActivity extends Activity {
         for(int i=0;i<saved.highlights().length();i++){JSONObject f=saved.highlights().optJSONObject(i);if(f==null)continue;int ply=f.optInt("ply");LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.addView(button(label(ply)+" · "+f.optString("title"),()->{show(ply);new AlertDialog.Builder(this).setTitle(f.optString("title")).setMessage(f.optString("reason")+"\n\n표시된 국면은 해당 수를 두기 직전입니다.").setPositiveButton("실전 수와 해설 보기",(d,w)->{show(ply+1);requestExplanation(ply);}).setNegativeButton("직전 국면 보기",null).show();}));card.addView(text(f.optString("reason"),13,muted));highlightList.addView(card);}
     }
     @Override protected void onSaveInstanceState(Bundle out){out.putInt("index",index);super.onSaveInstanceState(out);}
-    @Override protected void onDestroy(){destroyed=true;cancel=true;engineJobs.shutdownNow();coachJobs.shutdownNow();if(engine!=null)engine.close();super.onDestroy();}
+    @Override protected void onDestroy(){destroyed=true;cancel=true;engineJobs.shutdownNow();coachJobs.shutdownNow();EngineWork.close(()->{if(engine!=null)engine.close();});super.onDestroy();}
 }
