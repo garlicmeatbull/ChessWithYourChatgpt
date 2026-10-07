@@ -22,6 +22,11 @@ public final class NativeSmoke extends Instrumentation {
                 db.patch(played,0,new JSONObject().put("aiResponse",new JSONObject().put("model","test-model")).put("aiText","test explanation"));
                 check(db.find(played).analyses().getJSONObject("0").getString("local").equals("best e2e4"),"late AI preserves Stockfish data");
                 check(db.find(played).analyses().getJSONObject("0").getJSONObject("aiResponse").getString("model").equals("test-model"),"model and explanation persist");
+                db.explanation(played,0,new JSONObject().put("model","model-a"),"first coach");
+                db.explanation(played,0,new JSONObject().put("model","model-b"),"second coach");
+                JSONObject byModel=db.find(played).analyses().getJSONObject("0").getJSONObject("aiByModel");
+                check(byModel.length()==2&&byModel.getJSONObject("model-a").getString("text").equals("first coach"),"switching models retains both explanations");
+                check(db.find(played).analyses().getJSONObject("0").getJSONObject("details").getBoolean("test"),"multi-model explanations retain engine analysis");
                 db.highlights(played,Collections.singletonList(new Highlights.Finding(2,"played highlight","reason","candidate-comparison",70)));
                 db.highlights(imported,Collections.singletonList(new Highlights.Finding(2,"import highlight","reason","good-decision",80)));
                 check(db.find(played).highlights().length()==1&&db.find(imported).highlights().length()==1,"both game sources support highlights");

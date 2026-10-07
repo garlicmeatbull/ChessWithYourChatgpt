@@ -50,6 +50,16 @@ public final class CoreTest {
         var spaced=Highlights.select(List.of(opportunity,new Highlights.Finding(9,"other","reason","good-decision",90),new Highlights.Finding(15,"later","reason","good-decision",80)));
         check(spaced.size()==2,"highlights spread across game rather than adjacent repeated mistakes");
         check(Difficulty.from("ELO_1600").elo==1600&&Difficulty.FULL.elo==0&&Difficulty.FULL.skill==20,"difficulty presets distinguish full-strength analysis");
+        var judged=new Stockfish.Analysis("e2e4",List.of(best));
+        check(MoveJudgment.assess(start,"e2e4",judged,best).kind()==MoveJudgment.Kind.BEST,"ordinary best move is not labeled brilliant");
+        check(MoveJudgment.assess(start,"d2d4",judged,actual).kind()==MoveJudgment.Kind.INACCURACY,"moderate evaluation loss classification");
+        check(MoveJudgment.assess(start,"d2d4",judged,new Stockfish.Line(1,16,-400,null,List.of("d2d4"))).kind()==MoveJudgment.Kind.BLUNDER,"large evaluation loss is blunder");
+        check(MoveJudgment.assess(start,"d2d4",judged,null).kind()==MoveJudgment.Kind.UNKNOWN,"missing played score does not fabricate a judgment");
+        Chess blackPosition=sequence("e2e4");var blackBest=new Stockfish.Line(1,16,-50,null,List.of("e7e5"));var blackBad=new Stockfish.Line(1,16,400,null,List.of("a7a6"));
+        check(MoveJudgment.assess(blackPosition,"a7a6",new Stockfish.Analysis("e7e5",List.of(blackBest)),blackBad).kind()==MoveJudgment.Kind.BLUNDER,"judgments normalize Black perspective");
+        Chess sacrifice=new Chess("4k3/4p3/3p4/4p3/8/5N2/3P4/4K3 w - - 0 1");var sacrificeLine=new Stockfish.Line(1,16,50,null,List.of("f3e5","d6e5","d2d3","e7e6"));var sacrificeAnalysis=new Stockfish.Analysis("f3e5",List.of(sacrificeLine));
+        check(MoveJudgment.assess(sacrifice,"f3e5",sacrificeAnalysis,sacrificeLine).kind()==MoveJudgment.Kind.BRILLIANT,"verified PV sacrifice is explicitly a brilliant candidate");
+        check(MoveJudgment.assess(sacrifice,"f3e5",sacrificeAnalysis,new Stockfish.Line(1,8,50,null,sacrificeLine.pv())).kind()==MoveJudgment.Kind.BEST,"shallow search cannot claim brilliant candidate");
         if(args.length>0)try(Stockfish fish=new Stockfish(args[0])) {
             var a=fish.analyze(new Chess(),300,3,null);check(a.lines().size()==3,"real Stockfish MultiPV 3");
             check(new Chess().legalMoves().contains(Chess.Move.parse(a.best())),"real engine returns legal move");

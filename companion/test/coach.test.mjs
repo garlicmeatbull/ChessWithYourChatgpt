@@ -36,11 +36,16 @@ test('OAuth method is verified without returning credential-bearing CLI output',
 });
 test('HTTP pairing, models, explanation, malformed body and provider errors',async t=>{
  const coach=createCoach(async()=>({text:explanation}),{models,defaultModel});
+ coach.deviceLogin={get:()=>({status:"waiting"}),start:async()=>({status:"waiting",verificationUrl:"https://auth.openai.com/codex/device",userCode:"TEST-12345"})};
  coach.authStatus=async()=>({signedIn:true,method:'official-codex-chatgpt'});
  const server=http.createServer(createHandler(coach,token));await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>server.close());
  const base=`http://127.0.0.1:${server.address().port}`;const headers={authorization:`Bearer ${token}`,'content-type':'application/json'};
  assert.equal((await fetch(base+'/health')).status,200);
  assert.equal((await fetch(base+'/v1/models')).status,401);
+ assert.equal((await fetch(base+'/v1/auth/device',{method:'POST',body:'{}'})).status,401);
+ assert.equal((await (await fetch(base+'/v1/auth/device',{headers})).json()).status,'waiting');
+ assert.equal((await (await fetch(base+'/v1/auth/device',{method:'POST',headers,body:'{}'})).json()).userCode,'TEST-12345');
+ assert.equal((await fetch(base+'/v1/auth/device',{method:'POST',headers,body:'x'.repeat(1025)})).status,413);
  assert.deepEqual((await (await fetch(base+'/v1/models',{headers})).json()).models,models);
  assert.equal((await (await fetch(base+'/v1/auth/status',{headers})).json()).signedIn,true);
  const good=await fetch(base+'/v1/explain',{method:'POST',headers,body:JSON.stringify(sample())});assert.equal(good.status,200);assert.deepEqual((await good.json()).explanation,explanation);

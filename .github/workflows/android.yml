@@ -25,6 +25,20 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: companion/package-lock.json
+      - name: Optional stable development signing identity
+        env:
+          CHESS_DEBUG_KEYSTORE_BASE64: ${{ secrets.CHESS_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          python3 - <<'PYTHON'
+          import base64, os
+          from pathlib import Path
+          value = os.environ.get("CHESS_DEBUG_KEYSTORE_BASE64", "")
+          if value:
+              path = Path.home() / ".android" / "debug.keystore"
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(base64.b64decode(value, validate=True))
+              path.chmod(0o600)
+          PYTHON
       - name: Android toolchain
         run: python3 scripts/bootstrap-cloud.py
       - name: Dependencies and native engines
@@ -37,12 +51,13 @@ jobs:
       - name: Build and lint
         run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest assembleRelease lintDebug
       - name: Corresponding source with NNUE
-        run: python3 scripts/package-source.py
+        run: |
+          python3 scripts/package-source.py
+          cp app/build/outputs/apk/debug/app-debug.apk artifacts/ChessCoach-0.2.0.apk
       - uses: actions/upload-artifact@v4
         with:
           name: ChessCoach-Android-and-source
           if-no-files-found: error
           path: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            artifacts/ChessCoach-0.1.0-source.zip
+            artifacts/ChessCoach-0.2.0.apk
+            artifacts/ChessCoach-0.2.0-source.zip

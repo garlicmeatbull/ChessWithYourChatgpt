@@ -7,6 +7,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { createCoach } from './coach.mjs';
 import { oauthStatus } from './oauth.mjs';
+import {createDeviceLogin} from './device-login.mjs';
 import { fileURLToPath } from 'node:url';
 
 export function createHandler(coach, token) {
@@ -18,6 +19,12 @@ export function createHandler(coach, token) {
     if(actual.length!==expected.length||!timingSafeEqual(actual,expected))return reply(401,{error:'Unauthorized'});
     if(req.method==='GET' && req.url==='/v1/models')return reply(200,{models:coach.models,defaultModel:coach.defaultModel});
     if(req.method==='GET' && req.url==='/v1/auth/status')return reply(200,await coach.authStatus());
+    if(req.method==='GET'&&req.url==='/v1/auth/device')return reply(200,coach.deviceLogin?.get()||{status:'unavailable'});
+    if(req.method==='POST'&&req.url==='/v1/auth/device'){
+      if(!coach.deviceLogin)return reply(503,{error:'Device login unavailable'});
+      let size=0;for await(const part of req){size+=part.length;if(size>1024)return reply(413,{error:'Payload too large'});}
+      try{return reply(200,await coach.deviceLogin.start());}catch{return reply(502,{error:'Official Codex device login unavailable'});}
+    }
     if(req.method!=='POST'||req.url!=='/v1/explain')return reply(404,{error:'Not found'});
     if(!req.headers['content-type']?.startsWith('application/json'))return reply(415,{error:'JSON required'});
     let size=0,parts=[];
@@ -60,6 +67,7 @@ export async function start(env=process.env) {
   };
   const coach=createCoach(provider,{models,defaultModel});
   coach.authStatus=()=>oauthStatus(oauthEnv);
+  coach.deviceLogin=createDeviceLogin(oauthEnv);
   const handler=createHandler(coach,token);
   if(Boolean(env.COACH_TLS_CERT)!==Boolean(env.COACH_TLS_KEY))throw new Error('Provide both TLS certificate and key');
   const server=env.COACH_TLS_CERT?https.createServer({cert:readFileSync(env.COACH_TLS_CERT),key:readFileSync(env.COACH_TLS_KEY)},handler):http.createServer(handler);
@@ -68,6 +76,6 @@ export async function start(env=process.env) {
   if(host!=='127.0.0.1'&&host!=='::1'&&!env.COACH_TLS_CERT)throw new Error('Remote listeners require TLS; use a local reverse proxy for HTTP');
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,host,resolve);});
   console.log(`Chess coach listening on ${host}:${port}; OAuth checked on first explanation. Models: ${models.join(', ')}`);
-  server.on('close',()=>rmSync(workspace,{recursive:true,force:true}));return server;
+  server.on('close',()=>{coach.deviceLogin.close();rmSync(workspace,{recursive:true,force:true});});return server;
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href)start().catch(e=>{console.error(e.message);process.exitCode=1;});

@@ -1,40 +1,12 @@
 package com.chesscoach.app;
-import android.app.*;
+import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
-import android.graphics.Typeface;
 import android.widget.*;
 import java.util.*;
-
 public final class RecordsActivity extends Activity {
-    private LinearLayout list;
-    private int ink,muted;
-    @Override public void onCreate(Bundle state){super.onCreate(state);ink=getColor(R.color.ink);muted=getColor(R.color.muted);ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(getColor(R.color.background));list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);list.setPadding(Ui.dp(this,16),Ui.dp(this,12),Ui.dp(this,16),Ui.dp(this,24));scroll.addView(list);setContentView(scroll);list.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(Ui.dp(this,16),i.getSystemWindowInsetTop()+Ui.dp(this,12),Ui.dp(this,16),i.getSystemWindowInsetBottom()+Ui.dp(this,24));return i;});}
-    private TextView text(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(0,8,0,12);return t;}
-    private Button button(String title,Runnable action){return Ui.button(this,title,action);}
-    @Override protected void onResume(){super.onResume();render();}
-    private void render(){
-        list.removeAllViews();list.addView(button("‹ 대국으로 돌아가기",this::finish));TextView title=text("나의 대국 기록",27,ink);title.setTypeface(null,Typeface.BOLD);list.addView(title);
-        list.addView(text("직접 둔 대국과 가져온 대국을 한곳에서. 추천수와 해설은 기기에 저장됩니다.",14,muted));
-        list.addView(button("PGN · UCI 대국 가져오기",this::importGame));
-        List<Records.Saved> games=Records.get(this).list();if(games.isEmpty())list.addView(text("아직 기록이 없습니다. 대국을 두거나 기록을 가져오세요.",16,muted));
-        for(var game:games){
-            LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(Ui.dp(this,16),Ui.dp(this,16),Ui.dp(this,16),Ui.dp(this,16));
-            android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(getColor(R.color.surface));bg.setCornerRadius(16);card.setBackground(bg);
-            card.addView(text(game.title(),19,ink));String date=new java.text.SimpleDateFormat("yyyy.MM.dd HH:mm",Locale.getDefault()).format(new Date(game.created()));
-            int explanations=0;Iterator<String> keys=game.analyses().keys();while(keys.hasNext()){var entry=game.analyses().optJSONObject(keys.next());if(entry!=null&&entry.has("aiResponse"))explanations++;}
-            card.addView(text((game.origin().equals("played")?"직접 대국":"가져온 대국")+" · "+game.plies()+" 반수 · "+date+"\n해설 "+explanations+"개 · 하이라이트 "+game.highlights().length()+"개",12,muted));
-            card.setOnClickListener(v->startActivity(new Intent(this,ReviewActivity.class).putExtra("recordId",game.id())));card.setClickable(true);
-            LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,14,0,0);list.addView(card,p);
-        }
-    }
-    private void importGame(){
-        EditText input=new EditText(this);input.setTextColor(ink);input.setMinLines(5);input.setMaxLines(10);input.setHint("1. e4 e5 2. Nf3 Nc6 …\n또는 e2e4 e7e5 g1f3 b8c6");
-        LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(20,10,20,10);form.addView(text("PGN의 메인 라인을 가져옵니다. 주석과 가지 변화는 제외합니다. 가져온 뒤 Stockfish 분석과 학습 하이라이트를 생성합니다.",14,muted));form.addView(input);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("대국 가져오기").setView(form).setPositiveButton("가져오기",null).setNegativeButton("취소",null).create();
-        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            try{Pgn.Game game=Pgn.parse(input.getText().toString());if(game.plies().isEmpty())throw new IllegalArgumentException("분석할 수가 없습니다.");String title=game.tags().getOrDefault("White","백")+" vs "+game.tags().getOrDefault("Black","흑");long id=Records.get(this).create(title,"imported",game);dialog.dismiss();startActivity(new Intent(this,ReviewActivity.class).putExtra("recordId",id).putExtra("autoAnalyze",true));}
-            catch(Exception e){input.setError(e.getMessage());}
-        }));dialog.show();
-    }
+    private LinearLayout root,list;private int filter=0;private final Button[] filters=new Button[3];
+    @Override public void onCreate(Bundle state){super.onCreate(state);root=Ui.screen(this,true);LinearLayout header=new LinearLayout(this);header.setGravity(android.view.Gravity.CENTER_VERTICAL);header.addView(Ui.button(this,"‹",this::finish),new LinearLayout.LayoutParams(Ui.dp(this,44),Ui.dp(this,44)));TextView title=Ui.text(this,"대국 기록",22,true);title.setPadding(Ui.dp(this,10),0,0,0);header.addView(title,new LinearLayout.LayoutParams(0,-2,1));header.addView(Ui.primary(this,"+ 기록 추가",()->startActivity(new Intent(this,ImportActivity.class))));root.addView(header);Ui.gap(root,16);root.addView(Ui.text(this,"지난 수에서, 다음 실력을 발견하세요.",15,false));Ui.gap(root,16);LinearLayout tabs=new LinearLayout(this);for(int i=0;i<3;i++){final int selected=i;Button b=Ui.button(this,new String[]{"전체","직접 대국","가져온 기보"}[i],()->{filter=selected;render();});filters[i]=b;tabs.addView(b,new LinearLayout.LayoutParams(0,Ui.dp(this,48),1));}root.addView(tabs);Ui.gap(root,16);list=Ui.column(this);root.addView(list);}
+    @Override public void onResume(){super.onResume();render();}
+    private void render(){for(int i=0;i<filters.length;i++){Button b=filters[i];android.graphics.drawable.GradientDrawable bg=Ui.surface(this,14);if(i==filter)bg.setColor(0xFF286B50);b.setBackground(bg);b.setTextColor(i==filter?0xFFFFFFFF:getColor(R.color.ink));b.setSelected(i==filter);}list.removeAllViews();List<Records.Saved> games=Records.get(this).list();int shown=0;for(var game:games){if(filter==1&&!game.origin().equals("played")||filter==2&&!game.origin().equals("imported"))continue;shown++;LinearLayout card=Ui.card(this);TextView tag=Ui.text(this,game.origin().equals("played")?"PLAY  ·  직접 대국":"IMPORT  ·  가져온 기보",11,true);tag.setTextColor(getColor(R.color.muted));card.addView(tag);Ui.gap(card,8);card.addView(Ui.text(this,game.title(),19,true));Ui.gap(card,6);String date=new java.text.SimpleDateFormat("MM.dd  HH:mm",Locale.getDefault()).format(new Date(game.created()));card.addView(Ui.text(this,date+"  ·  "+game.plies()+" 반수",13,false));int ai=0,analyzed=0;Iterator<String> keys=game.analyses().keys();while(keys.hasNext()){var e=game.analyses().optJSONObject(keys.next());if(e!=null){if(e.has("aiResponse"))ai++;if(e.has("details"))analyzed++;}}Ui.gap(card,14);card.addView(Ui.text(this,"분석 "+analyzed+" / "+game.plies()+"    조언 "+ai+"    하이라이트 "+game.highlights().length()+"   →",13,true));card.setOnClickListener(v->startActivity(new Intent(this,ReviewActivity.class).putExtra("recordId",game.id())));card.setContentDescription(game.title()+" 복기 열기");list.addView(card);Ui.gap(list,12);}if(shown==0){LinearLayout empty=Ui.card(this);empty.addView(Ui.text(this,"첫 기록을 남겨 보세요.",23,true));Ui.gap(empty,12);empty.addView(Ui.text(this,"대국을 시작하거나 PGN 기보를 추가하면\n수와 조언을 여기에서 다시 볼 수 있어요.",15,false));Ui.gap(empty,20);empty.addView(Ui.primary(this,"Stockfish와 대국",()->startActivity(new Intent(this,GameSetupActivity.class))));list.addView(empty);}}
 }

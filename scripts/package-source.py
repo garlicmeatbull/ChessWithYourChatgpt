@@ -9,7 +9,7 @@ files = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others'
 net = 'vendor/stockfish/src/nn-1a298aa575a0.nnue'
 assert (root / net).is_file(), 'Run scripts/stockfish-assets.py first'
 files.append(net)
-output = root / 'artifacts/ChessCoach-0.1.0-source.zip'
+output = root / 'artifacts/ChessCoach-0.2.0-source.zip'
 output.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
     for name in sorted(set(files)):

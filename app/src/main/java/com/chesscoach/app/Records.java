@@ -40,6 +40,12 @@ public final class Records extends SQLiteOpenHelper {
             ContentValues v=new ContentValues();v.put("analyses",old.analyses.toString());v.put("updated",System.currentTimeMillis());getWritableDatabase().update("games",v,"id=?",new String[]{Long.toString(id)});
         }catch(JSONException e){throw new IllegalStateException(e);}
     }
+    public synchronized void explanation(long id,int ply,JSONObject response,String text)throws JSONException {
+        Saved old=find(id);if(old==null||ply<0||ply>=old.plies)return;
+        JSONObject entry=old.analyses.optJSONObject(Integer.toString(ply));JSONObject all=entry==null?null:entry.optJSONObject("aiByModel");if(all==null)all=new JSONObject();
+        all.put(response.getString("model"),new JSONObject().put("response",response).put("text",text));
+        patch(id,ply,new JSONObject().put("aiByModel",all).put("aiResponse",response).put("aiText",text));
+    }
     public synchronized void highlights(long id,List<Highlights.Finding> findings){
         JSONArray array=new JSONArray();try{for(var f:findings)array.put(new JSONObject().put("ply",f.ply()).put("title",f.title()).put("reason",f.reason()).put("focus",f.focus()).put("priority",f.priority()));}catch(JSONException e){throw new IllegalStateException(e);}
         ContentValues v=new ContentValues();v.put("highlights",array.toString());v.put("updated",System.currentTimeMillis());getWritableDatabase().update("games",v,"id=?",new String[]{Long.toString(id)});

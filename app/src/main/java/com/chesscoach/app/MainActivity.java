@@ -1,161 +1,63 @@
 package com.chesscoach.app;
-
 import android.app.*;
 import android.os.*;
-import android.graphics.Color;
-import android.content.SharedPreferences;
-import android.text.InputType;
+import android.content.*;
 import android.view.*;
 import android.widget.*;
 import org.json.*;
 import java.util.*;
 import java.util.concurrent.*;
 
+/** Native play screen: pinned advice, live model picker, board-first visual feedback. */
 public final class MainActivity extends Activity {
-    private Chess game=new Chess();
-    private Stockfish engine;
-    private Stockfish opponent;
+    private Chess game=new Chess();private Stockfish engine,opponent;
     private final ExecutorService engineJobs=Executors.newSingleThreadExecutor(),coachJobs=Executors.newSingleThreadExecutor();
     private final List<String> moves=new ArrayList<>(),fens=new ArrayList<>();
-    private final Map<String,Integer> repetitions=new HashMap<>();
-    private final List<Integer> trend=new ArrayList<>();
-    private final List<Feedback> feedback=new ArrayList<>();
-    private volatile int generation=0;
-    private boolean busy=true;
-    private volatile boolean destroyed=false;
-    private BoardView board;
-    private TextView status,evaluation,history,coach,headline;
-    private Button retry;
-    private SharedPreferences prefs;
-    private CoachClient client;
-    private long recordId;
-    private int BG,INK,MUTED;
-    private static class Feedback { String local,ai=""; boolean pending; JSONObject payload,details; Feedback(String s){local=s;} }
-    @Override public void onCreate(Bundle state) {
-        super.onCreate(state);prefs=getSharedPreferences("coach",0);client=new CoachClient(this);
-        BG=getColor(R.color.background);INK=getColor(R.color.ink);MUTED=getColor(R.color.muted);
-        getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
-        buildUi();restore();connectEngine();
+    private final Map<String,Integer> repetitions=new HashMap<>();private final List<Integer> trend=new ArrayList<>();private final List<Feedback> feedback=new ArrayList<>();
+    private volatile int generation=0;private volatile boolean destroyed=false,parked=false;
+    private boolean busy=true,preview=false;private int focus=-1;
+    private BoardView board;private TextView status,evaluation,coach,moveLabel;private Button modelChip,suggestion,undoButton;
+    private LinearLayout moveStrip;private SharedPreferences prefs;private CoachClient client;private long recordId;private int BG,INK,MUTED;
+    private static class Feedback {String local,ai="",pendingModel="",aiModel="";boolean pending;int requestVersion;JSONObject payload,details;Feedback(String s){local=s;}}
+    @Override public void onCreate(Bundle state){super.onCreate(state);prefs=getSharedPreferences("coach",0);client=new CoachClient(this);BG=getColor(R.color.background);INK=getColor(R.color.ink);MUTED=getColor(R.color.muted);buildUi();
+        if(getIntent().getBooleanExtra("newGame",false)){repetitions.put(game.key(),1);save();getIntent().removeExtra("newGame");}else restore();connectEngine();}
+    private int dp(int n){return Ui.dp(this,n);}private TextView text(String s,int size,int color){TextView t=Ui.text(this,s,size,false);t.setTextColor(color);return t;}
+    private Button button(String s,Runnable action){return Ui.button(this,s,action);}
+    private void buildUi(){
+        LinearLayout root=Ui.screen(this,false);LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.addView(button("‹",this::finish),new LinearLayout.LayoutParams(dp(44),dp(44)));TextView title=Ui.text(this,"대국",20,true);title.setPadding(dp(10),0,0,0);header.addView(title,new LinearLayout.LayoutParams(0,-2,1));header.addView(button("⋯",this::menu),new LinearLayout.LayoutParams(dp(44),dp(44)));root.addView(header);Ui.gap(root,8);
+        LinearLayout advice=Ui.card(this);advice.setPadding(dp(14),dp(10),dp(14),dp(12));LinearLayout coachHeader=new LinearLayout(this);coachHeader.setGravity(Gravity.CENTER_VERTICAL);coachHeader.addView(Ui.text(this,"AI 코치",14,true),new LinearLayout.LayoutParams(0,-2,1));modelChip=button(Ui.modelLabel(this)+" ⌄",this::chooseModel);modelChip.setMinHeight(dp(36));coachHeader.addView(modelChip,new LinearLayout.LayoutParams(-2,dp(40)));advice.addView(coachHeader);Ui.gap(advice,4);coach=text("첫 수를 두면 판단의 근거와 다음 계획을 알려드려요.",15,INK);coach.setMaxLines(4);coach.setEllipsize(android.text.TextUtils.TruncateAt.END);coach.setMinHeight(dp(54));coach.setOnClickListener(v->{if(prefs.getString("endpoint","").isEmpty())startActivity(new Intent(this,ConnectionActivity.class));else details();});advice.addView(coach);root.addView(advice);Ui.gap(root,8);
+        LinearLayout info=new LinearLayout(this);info.setGravity(Gravity.CENTER_VERTICAL);status=text("Stockfish 준비 중…",12,MUTED);info.addView(status,new LinearLayout.LayoutParams(0,dp(28),1));moveLabel=text("",12,INK);moveLabel.setOnClickListener(v->Ui.legend(this));info.addView(moveLabel);root.addView(info);
+        FrameLayout frame=new FrameLayout(this);board=new BoardView(this);board.onSquare=this::select;FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER);frame.addView(board,bp);root.addView(frame,new LinearLayout.LayoutParams(-1,0,1));
+        evaluation=text("백 기준 평가 · 분석 대기",12,MUTED);evaluation.setGravity(Gravity.CENTER_VERTICAL);root.addView(evaluation,new LinearLayout.LayoutParams(-1,dp(30)));
+        HorizontalScrollView strip=new HorizontalScrollView(this);strip.setHorizontalScrollBarEnabled(false);moveStrip=new LinearLayout(this);strip.addView(moveStrip);root.addView(strip,new LinearLayout.LayoutParams(-1,dp(38)));Ui.gap(root,6);
+        LinearLayout controls=new LinearLayout(this);suggestion=button("추천수 보기",()->{preview=!preview;refresh();});undoButton=button("무르기",this::undo);Button retry=button("다시 설명",()->{if(focus>=0)requestExplanation(feedback.get(focus),generation);else startActivity(new Intent(this,ConnectionActivity.class));});for(Button b:new Button[]{suggestion,retry,undoButton}){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.setMargins(dp(2),0,dp(2),0);controls.addView(b,lp);}root.addView(controls);
     }
-    private int dp(int x){return (int)(x*getResources().getDisplayMetrics().density);}
-    private TextView text(String value,int size,int color) { TextView v=new TextView(this);v.setText(value);v.setTextSize(size);v.setTextColor(color);v.setPadding(0,dp(5),0,dp(5));return v; }
-    private Button button(String title,Runnable action) {
-        Button b=new Button(this);b.setText(title);b.setTextColor(INK);b.setTextSize(13);b.setAllCaps(false);
-        android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(getColor(R.color.surface));bg.setCornerRadius(dp(12));
-        b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x334C9670),bg,null));
-        b.setOnClickListener(v->action.run());return b;
+    private void menu(){new AlertDialog.Builder(this).setTitle("대국 메뉴").setItems(new String[]{"대국 기록","새 대국 · 난이도 선택","AI 코치 연결","수 평가 표시 안내"},(d,n)->{if(n==0)startActivity(new Intent(this,RecordsActivity.class));else if(n==1){startActivity(new Intent(this,GameSetupActivity.class));finish();}else if(n==2)startActivity(new Intent(this,ConnectionActivity.class));else Ui.legend(this);}).show();}
+    private void chooseModel(){Ui.models(this,()->{modelChip.setText(Ui.modelLabel(this)+" ⌄");if(focus>=0){for(Feedback other:feedback){other.requestVersion++;other.pending=false;}Feedback f=feedback.get(focus);requestExplanation(f,generation);}renderFeedback();});}
+    private void details(){ScrollView scroll=new ScrollView(this);LinearLayout content=Ui.card(this);if(focus>=0){Feedback f=feedback.get(focus);content.addView(text(currentAdvice(f),16,INK));Ui.gap(content,20);content.addView(text(f.local,14,MUTED));}scroll.addView(content);new AlertDialog.Builder(this).setTitle("이번 수의 조언").setView(scroll).setPositiveButton("닫기",null).show();}
+    private void connectEngine(){busy=true;int epoch=generation;engineJobs.submit(()->{if(destroyed||parked)return;try{if(engine==null)engine=new Stockfish(getApplicationInfo().nativeLibraryDir+"/libstockfish.so");if(opponent==null)opponent=new Stockfish(getApplicationInfo().nativeLibraryDir+"/libstockfish.so");if(destroyed){closeEngines();return;}runOnUiThread(()->{if(epoch!=generation||destroyed||parked)return;busy=false;refresh();if(!feedback.isEmpty()&&feedback.get(feedback.size()-1).details==null){int ply=feedback.size()-1;Chess before=new Chess(ply==0?Chess.START:fens.get(ply-1));busy=true;analyzePlayed(before,game.copy(),Chess.Move.parse(moves.get(ply)),feedback.get(ply),ply,epoch,!before.white);}else if(!game.white&&game.terminal(repetitions.getOrDefault(game.key(),1))==null)botTurn(epoch);});}catch(Exception e){runOnUiThread(()->{if(epoch==generation&&!destroyed){busy=true;status.setText("엔진 준비 실패");coach.setText("대국 메뉴에서 새 대국으로 다시 시작해 주세요.");}});}});}
+    private void select(int s){if(preview){preview=false;refresh();return;}if(busy||!game.white||game.terminal(repetitions.getOrDefault(game.key(),1))!=null)return;List<Chess.Move> legal=game.legalMoves(),choices=new ArrayList<>();for(var m:legal)if(m.from()==board.selected&&m.to()==s)choices.add(m);if(!choices.isEmpty()){if(choices.size()>1)new AlertDialog.Builder(this).setTitle("승격 기물").setItems(new String[]{"퀸","룩","비숍","나이트"},(d,w)->play(choices.get(w),generation,false)).show();else play(choices.get(0),generation,false);return;}board.selected=game.squares[s]!='.'&&Chess.color(game.squares[s])?s:-1;board.targets.clear();for(var m:legal)if(m.from()==board.selected)board.targets.add(m.to());board.invalidate();}
+    private void play(Chess.Move move,int epoch,boolean bot){
+        if(epoch!=generation||destroyed||parked)return;Chess before=game.copy();busy=true;preview=false;board.selected=-1;board.targets.clear();game.play(move);moves.add(move.uci());fens.add(game.fen());repetitions.merge(game.key(),1,Integer::sum);board.lastFrom=move.from();board.lastTo=move.to();
+        Feedback entry=new Feedback((before.white?"내 수":"상대 수")+" · "+before.san(move)+"\n수의 평가를 계산하고 있어요.");feedback.add(entry);int ply=feedback.size()-1;if(!bot||focus<0)focus=ply;save();persistFeedback(entry,ply);refresh();analyzePlayed(before,game.copy(),move,entry,ply,epoch,bot);
     }
-    private void buildUi() {
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(16),dp(12),dp(16),dp(20));scroll.addView(root);setContentView(scroll);
-        root.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(dp(16),insets.getSystemWindowInsetTop()+dp(12),dp(16),insets.getSystemWindowInsetBottom()+dp(20));return insets;});
-        root.addView(text("CHESS / COACH",12,MUTED));headline=text("한 수씩, 더 깊게.",27,INK);root.addView(headline);
-        status=text("Stockfish 시작 중…",14,MUTED);root.addView(status);
-        board=new BoardView(this);board.onSquare=this::select;
-        int size=getResources().getDisplayMetrics().widthPixels-dp(32);root.addView(board,new LinearLayout.LayoutParams(-1,size));
-        evaluation=text("백 기준 평가 · 분석 대기",14,MUTED);root.addView(evaluation);
-        LinearLayout buttons=new LinearLayout(this);
-        for(Button b:new Button[]{button("새 대국",()->new AlertDialog.Builder(this).setMessage("새 대국을 시작할까요?").setPositiveButton("시작",(d,w)->reset()).setNegativeButton("취소",null).show()),button("무르기",this::undo),button("설정",this::settings)}){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(44),1);p.setMargins(dp(3),dp(8),dp(3),dp(10));buttons.addView(b,p);}
-        root.addView(buttons);
-        root.addView(button("나의 대국 기록 · 가져오기",()->startActivity(new android.content.Intent(this,RecordsActivity.class))));root.addView(text("이번 수의 피드백",20,INK));
-        coach=text("기물을 선택한 뒤 목적지 칸을 누르세요. 백으로 Stockfish와 대국합니다.",16,INK);root.addView(coach);
-        retry=button("Codex 설명 재시도",()->{if(!feedback.isEmpty())requestExplanation(feedback.get(feedback.size()-1),generation);});root.addView(retry);retry.setVisibility(View.GONE);
-        root.addView(text("대국 흐름",20,INK));history=text("아직 둔 수가 없습니다.",14,MUTED);root.addView(history);
-        TextView license=text("Stockfish 19 · 오픈소스 라이선스\nCodex 설명은 선택한 모델과 계정 이용 한도를 사용합니다.",11,MUTED);
-        license.setOnClickListener(v->{try(var in=getAssets().open("THIRD_PARTY_NOTICES.txt")){java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1)out.write(buf,0,n);TextView content=text(new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8),12,INK);content.setPadding(dp(16),dp(16),dp(16),dp(16));ScrollView view=new ScrollView(this);view.addView(content);new AlertDialog.Builder(this).setTitle("오픈소스 라이선스").setView(view).setPositiveButton("닫기",null).show();}catch(Exception ignored){}});root.addView(license);
+    private void analyzePlayed(Chess before,Chess after,Chess.Move move,Feedback entry,int ply,int epoch,boolean bot){engineJobs.submit(()->{try{var analysis=engine.analyze(before,bot?650:1300,3,null);Stockfish.Line played=null;for(var l:analysis.lines())if(!l.pv().isEmpty()&&l.pv().get(0).equals(move.uci()))played=l;if(played==null)played=engine.analyze(before,850,1,move.uci()).top();var afterAnalysis=engine.analyze(after,550,1,null);Stockfish.Line actual=played;runOnUiThread(()->{if(epoch!=generation||destroyed)return;var judgment=MoveJudgment.assess(before,move.uci(),analysis,actual);entry.local=judgment.kind().label+" · "+before.san(move)+"\n"+judgment.reason();if(afterAnalysis.top()!=null){trend.add(afterAnalysis.top().cp());if(trend.size()>6)trend.remove(0);evaluation.setText("백 기준 "+afterAnalysis.top().score()+" · 깊이 "+afterAnalysis.top().depth());}try{entry.payload=CoachClient.payload(before,after,move.uci(),analysis,actual,Ui.model(this),new ArrayList<>(trend));entry.details=AnalysisJson.details(analysis,actual,afterAnalysis).put("judgment",judgment.kind().name()).put("opponentDifficulty",Difficulty.from(prefs.getString("difficulty","ELO_1600")).label);}catch(Exception ignored){}save();persistFeedback(entry,ply);busy=false;refresh();requestExplanation(entry,epoch);if(!parked&&!game.white&&game.terminal(repetitions.getOrDefault(game.key(),1))==null)botTurn(epoch);});}catch(Exception e){runOnUiThread(()->{if(epoch==generation&&!destroyed){busy=true;status.setText("분석 중단 · 수는 저장됨");coach.setText("다시 대국을 열면 이어서 분석할 수 있어요.");closeEngines();}});}});}
+    private void botTurn(int epoch){if(epoch!=generation||destroyed||parked)return;busy=true;status.setText("Stockfish가 생각하는 중…");Chess position=game.copy();engineJobs.submit(()->{try{opponent.setDifficulty(Difficulty.from(prefs.getString("difficulty","ELO_1600")));var analysis=opponent.analyze(position,900,1,null);Chess.Move m=Chess.Move.parse(analysis.best());runOnUiThread(()->{if(epoch==generation&&!parked)play(m,epoch,true);});}catch(Exception e){runOnUiThread(()->{if(epoch==generation&&!destroyed)status.setText("응수 준비 실패 · 대국을 다시 열어 주세요");});}});}
+    private void requestExplanation(Feedback entry,int epoch){
+        if(entry.payload==null)return;String model=Ui.model(this);if(entry.pending&&model.equals(entry.pendingModel))return;
+        if(prefs.getString("endpoint","").isEmpty()){entry.ai="AI 코치를 연결하면 방금 수의 이유와 다음 계획을 알려드려요. 연결하기 →";renderFeedback();return;}
+        JSONObject cache=cached(entry,model);if(cache!=null){entry.ai=cache.optString("text");renderFeedback();return;}
+        int version=++entry.requestVersion;entry.pending=true;entry.pendingModel=model;entry.ai="방금 수의 판단과 다음 계획을 생각하고 있어요…";renderFeedback();final long targetRecord=recordId;final int targetPly=feedback.indexOf(entry);JSONObject request;try{request=new JSONObject(entry.payload.toString()).put("model",model);}catch(Exception e){entry.pending=false;return;}
+        coachJobs.submit(()->{if(destroyed||entry.requestVersion!=version)return;String result;try{JSONObject response=client.request("/v1/explain",request);result=AnalysisJson.explanation(response);Records.get(this).explanation(targetRecord,targetPly,response,result);}catch(Exception e){result="조언을 가져오지 못했어요. 다시 설명을 누르거나 코치 연결을 확인해 주세요.";}String finalResult=result;runOnUiThread(()->{if(entry.requestVersion!=version)return;entry.pending=false;if(epoch==generation&&!destroyed){entry.ai=finalResult;entry.aiModel=model;save();renderFeedback();}});});
     }
-    private void connectEngine() {
-        busy=true;int epoch=generation;engineJobs.submit(()->{
-            if(destroyed)return;
-            try { engine=new Stockfish(getApplicationInfo().nativeLibraryDir+"/libstockfish.so");opponent=new Stockfish(getApplicationInfo().nativeLibraryDir+"/libstockfish.so");if(destroyed){engine.close();opponent.close();return;}runOnUiThread(()->{if(epoch!=generation||destroyed)return;busy=false;refresh();if(!game.white&&game.terminal(repetitions.getOrDefault(game.key(),1))==null)botTurn(generation);}); }
-            catch(Exception e){runOnUiThread(()->{if(epoch!=generation||destroyed)return;busy=true;status.setText("Stockfish 시작 실패 · "+e.getMessage());coach.setText("엔진이 포함된 APK를 다시 설치하세요.");});}
-        });
+    private JSONObject cached(Feedback f,String model){if(recordId==0)return null;var saved=Records.get(this).find(recordId);if(saved==null)return null;JSONObject e=saved.analyses().optJSONObject(Integer.toString(feedback.indexOf(f)));if(e==null)return null;JSONObject all=e.optJSONObject("aiByModel");if(all!=null&&all.optJSONObject(model)!=null)return all.optJSONObject(model);JSONObject response=e.optJSONObject("aiResponse");if(response!=null&&model.equals(response.optString("model")))try{return new JSONObject().put("response",response).put("text",e.optString("aiText"));}catch(Exception ignored){}return null;}
+    private String currentAdvice(Feedback f){JSONObject c=cached(f,Ui.model(this));if(c!=null)return c.optString("text");if(f.pending&&Ui.model(this).equals(f.pendingModel))return "방금 수의 판단과 다음 계획을 생각하고 있어요…";if(prefs.getString("endpoint","").isEmpty())return "AI 코치를 연결하면 방금 수의 이유와 다음 계획을 알려드려요. 연결하기 →";return f.ai.isEmpty()||!Ui.model(this).equals(f.aiModel)?"이 모델의 조언을 받아 보세요. 아래 다시 설명을 누르면 됩니다.":f.ai;}
+    private void renderFeedback(){if(coach==null)return;modelChip.setText(Ui.modelLabel(this)+" ⌄");board.recommendation=board.playedArrow=null;board.judgedSquare=-1;board.judgment=MoveJudgment.Kind.UNKNOWN;moveLabel.setText("");
+        if(focus>=0&&focus<feedback.size()){Feedback f=feedback.get(focus);String advice=currentAdvice(f);if(advice.startsWith("CODEX /")){int line=advice.indexOf('\n');if(line>=0)advice=advice.substring(line+1);}coach.setText(advice);try{if(f.details!=null){var a=AnalysisJson.analysis(f.details.getJSONObject("analysis"));var actual=f.details.isNull("playedScore")?null:AnalysisJson.line(f.details.getJSONObject("playedScore"));Chess before=new Chess(focus==0?Chess.START:fens.get(focus-1));var result=MoveJudgment.assess(before,moves.get(focus),a,actual);board.judgment=result.kind();board.judgedSquare=Chess.Move.parse(moves.get(focus)).to();moveLabel.setText(result.kind().symbol+" "+result.kind().label);moveLabel.setTextColor(INK);if(preview&&a.top()!=null&&!a.top().pv().isEmpty()){board.recommendation=a.top().pv().get(0);board.playedArrow=moves.get(focus);}}}catch(Exception ignored){}}
+        else coach.setText(prefs.getString("endpoint","").isEmpty()?"기물을 선택해 첫 수를 두세요. AI 코치 연결하기 →":"첫 수를 두면 판단의 근거와 다음 계획을 알려드려요.");board.invalidate();
     }
-    private void select(int s) {
-        if(busy||!game.white||game.terminal(repetitions.getOrDefault(game.key(),1))!=null)return;
-        List<Chess.Move> legal=game.legalMoves();
-        List<Chess.Move> choices=new ArrayList<>();for(var m:legal)if(m.from()==board.selected&&m.to()==s)choices.add(m);
-        if(!choices.isEmpty()) {
-            if(choices.size()>1)new AlertDialog.Builder(this).setTitle("승격 기물").setItems(new String[]{"퀸","룩","비숍","나이트"},(d,w)->play(choices.get(w),generation,false)).show();
-            else play(choices.get(0),generation,false);return;
-        }
-        board.selected=game.squares[s]!='.'&&Chess.color(game.squares[s])?s:-1;board.targets.clear();
-        for(var m:legal)if(m.from()==board.selected)board.targets.add(m.to());board.invalidate();
-    }
-    private void play(Chess.Move move,int epoch,boolean bot) {
-        if(epoch!=generation||destroyed)return;
-        busy=true;board.selected=-1;board.targets.clear();board.invalidate();status.setText(bot?"Stockfish 응수 분석 중…":"선택한 수와 후보를 비교하는 중…");
-        Chess before=game.copy();
-        engineJobs.submit(()->{
-            try {
-                var analysis=engine.analyze(before,bot?500:1100,3,null);
-                Stockfish.Line played=null;
-                for(var l:analysis.lines())if(!l.pv().isEmpty()&&l.pv().get(0).equals(move.uci()))played=l;
-                if(played==null)played=engine.analyze(before,700,1,move.uci()).top();
-                Chess after=before.copy();after.play(move);
-                var afterAnalysis=engine.analyze(after,500,1,null);
-                Stockfish.Line actual=played;
-                runOnUiThread(()->{
-                    if(epoch!=generation||destroyed)return;
-                    game=after;moves.add(move.uci());fens.add(game.fen());repetitions.merge(game.key(),1,Integer::sum);
-                    board.lastFrom=move.from();board.lastTo=move.to();
-                    var top=analysis.top();String local=localFeedback(before,move.uci(),top,actual,afterAnalysis.top());
-                    Feedback entry=new Feedback((before.white?"백":"흑")+" "+move.uci()+"\n"+local);feedback.add(entry);
-                    if(afterAnalysis.top()!=null){trend.add(afterAnalysis.top().cp());if(trend.size()>6)trend.remove(0);evaluation.setText("백 기준 "+afterAnalysis.top().score()+" · 탐색 깊이 "+afterAnalysis.top().depth());}
-                    try{entry.payload=CoachClient.payload(before,after,move.uci(),analysis,actual,prefs.getString("model",""),new ArrayList<>(trend));entry.details=AnalysisJson.details(analysis,actual,afterAnalysis).put("opponentDifficulty",Difficulty.from(prefs.getString("difficulty","ELO_1600")).label);}catch(Exception ignored){}
-                    save();persistFeedback(entry,moves.size()-1);busy=false;refresh();requestExplanation(entry,epoch);
-                    if(game.terminal(repetitions.getOrDefault(game.key(),1))==null&&game.white==false)botTurn(epoch);
-                });
-            }catch(Exception e){runOnUiThread(()->{if(epoch==generation){busy=true;status.setText("분석 실패 · "+e.getMessage());coach.setText("새 대국으로 엔진을 다시 시작하세요.");}});}
-        });
-    }
-    private void botTurn(int epoch) {
-        if(epoch!=generation||destroyed)return;busy=true;status.setText("Stockfish가 생각하는 중…");Chess position=game.copy();
-        engineJobs.submit(()->{
-            try { opponent.setDifficulty(Difficulty.from(prefs.getString("difficulty","ELO_1600")));var analysis=opponent.analyze(position,900,1,null);Chess.Move move=Chess.Move.parse(analysis.best());runOnUiThread(()->{if(epoch==generation)play(move,epoch,true);}); }
-            catch(Exception e){runOnUiThread(()->{if(epoch==generation){busy=true;status.setText("Stockfish 응수 실패 · 새 대국으로 재시작하세요");}});}
-        });
-    }
-    private String localFeedback(Chess before,String played,Stockfish.Line best,Stockfish.Line actual,Stockfish.Line after) {
-        if(best==null||actual==null)return "종료 국면 · 후보 평가 없음";
-        int loss=Math.max(0,(best.value()-actual.value())*(before.white?1:-1));
-        String label=best.pv().get(0).equals(played)?"최선수":loss<=30?"좋은 수":loss<=100?"아쉬운 수":loss<=250?"실수":"큰 실수";
-        String delta=best.mate()!=null||actual.mate()!=null?"메이트 가능성 포함":String.format(Locale.US,"평가 손실 %.2f",loss/100.0);
-        String advantage=after==null?"대국 종료":after.mate()!=null?"강제 메이트 평가 "+after.score():Math.abs(after.cp())<40?"현재 흐름은 균형":(after.cp()>0?"백":"흑")+"에게 유리한 흐름";
-        return label+" · "+delta+"\n"+advantage+"\n추천 "+best.pv().get(0)+" · "+best.score()+" · 깊이 "+best.depth()+"\n예상 변화 "+String.join(" → ",best.pv())+"\n탐색 시간에 따른 추정입니다. 희생수의 탁월함을 자동 확정하지 않습니다.";
-    }
-    private void requestExplanation(Feedback entry,int epoch) {
-        if(entry.payload==null||entry.pending)return;
-        if(prefs.getString("endpoint","").trim().isEmpty()) { entry.ai="Codex 미연결 · 설정에서 OAuth 설명 서버를 연결하세요.";renderFeedback();return; }
-        entry.ai="Codex가 추천수의 근거를 설명하는 중…";renderFeedback();
-        entry.pending=true;
-        final long targetRecord=recordId;final int targetPly=feedback.indexOf(entry);
-        String model=prefs.getString("model","");
-        try { entry.payload.put("model",model); }catch(JSONException ignored){}
-        JSONObject request;try{request=new JSONObject(entry.payload.toString());}catch(Exception e){return;}
-        coachJobs.submit(()->{
-            if(destroyed)return;
-            String result;
-            try { JSONObject response=client.request("/v1/explain",request);result=AnalysisJson.explanation(response);Records.get(this).patch(targetRecord,targetPly,new JSONObject().put("aiResponse",response).put("aiText",result));
-            }catch(Exception e){result="Codex 설명 불가 · "+e.getMessage()+"\nStockfish 대국과 분석은 계속 가능합니다.";try{Records.get(this).patch(targetRecord,targetPly,new JSONObject().put("aiText",result));}catch(Exception ignored){}}
-            String finalResult=result;runOnUiThread(()->{entry.pending=false;if(epoch==generation&&!destroyed){entry.ai=finalResult;save();renderFeedback();}});
-        });
-    }
-    private void renderFeedback() {
-        if(feedback.isEmpty()){coach.setText("기물을 선택한 뒤 목적지를 누르세요.");retry.setVisibility(View.GONE);return;}
-        Feedback last=feedback.get(feedback.size()-1);coach.setText(last.local+"\n\n"+last.ai);retry.setVisibility(last.payload!=null?View.VISIBLE:View.GONE);
-        StringBuilder out=new StringBuilder();for(int i=Math.max(0,feedback.size()-8);i<feedback.size();i++){Feedback f=feedback.get(i);out.append(i+1).append(". ").append(f.local).append("\n").append(f.ai).append("\n\n");}history.setText(out.toString());
-    }
-    private void refresh(){board.board=game;board.invalidate();String terminal=game.terminal(repetitions.getOrDefault(game.key(),1));status.setText(terminal!=null?terminal:busy?"분석 중…":game.white?"백 차례 · "+Difficulty.from(prefs.getString("difficulty","ELO_1600")).label:"흑 차례 · Stockfish");renderFeedback();}
-    private void reset() {
-        generation++;recordId=0;game=new Chess();moves.clear();fens.clear();feedback.clear();trend.clear();repetitions.clear();repetitions.put(game.key(),1);board.selected=board.lastFrom=board.lastTo=-1;board.targets.clear();save();restoreEvaluation();refresh();
-        busy=true;engineJobs.submit(()->{if(engine!=null)engine.close();if(opponent!=null)opponent.close();engine=null;opponent=null;});connectEngine();
-    }
-    private void undo() {
-        if(busy||moves.isEmpty())return;generation++;
-        int keep=Math.max(0,moves.size()-(game.white?2:1));while(moves.size()>keep){moves.remove(moves.size()-1);fens.remove(fens.size()-1);if(!feedback.isEmpty())feedback.remove(feedback.size()-1);}
-        game=new Chess(keep==0?Chess.START:fens.get(keep-1));rebuildRepetitions();trend.clear();board.lastFrom=board.lastTo=board.selected=-1;board.targets.clear();save();refresh();evaluation.setText("백 기준 평가 · 다음 수에서 다시 분석");
-    }
+    private void refresh(){if(board==null)return;board.board=preview&&focus>=0?new Chess(focus==0?Chess.START:fens.get(focus-1)):game;String terminal=game.terminal(repetitions.getOrDefault(game.key(),1));status.setText(preview?"추천 이동 미리보기 · 착수 전 국면":terminal!=null?terminal:busy?"수 분석 중…":game.white?"내 차례 · "+Difficulty.from(prefs.getString("difficulty","ELO_1600")).label:"상대 차례");suggestion.setText(preview?"대국으로 돌아가기":"추천수 보기");suggestion.setEnabled(focus>=0&&feedback.get(focus).details!=null);undoButton.setEnabled(!busy&&!moves.isEmpty());renderFeedback();moveStrip.removeAllViews();for(int i=Math.max(0,moves.size()-12);i<moves.size();i++){final int ply=i;Chess before=new Chess(i==0?Chess.START:fens.get(i-1));Button b=button((i/2+1)+(i%2==0?". ":"… ")+before.san(Chess.Move.parse(moves.get(i))),()->{focus=ply;preview=true;refresh();});b.setTextSize(12);b.setMinHeight(dp(32));if(i==focus)b.setTextColor(0xFF428965);moveStrip.addView(b,new LinearLayout.LayoutParams(-2,dp(36)));}}
+    private void undo(){if(busy||moves.isEmpty())return;generation++;int keep=Math.max(0,moves.size()-(game.white?2:1));while(moves.size()>keep){moves.remove(moves.size()-1);fens.remove(fens.size()-1);feedback.remove(feedback.size()-1);}game=new Chess(keep==0?Chess.START:fens.get(keep-1));focus=keep==0?-1:Math.max(0,keep-2);preview=false;rebuildRepetitions();restoreEvaluation();board.lastFrom=board.lastTo=board.selected=-1;board.targets.clear();save();refresh();}
     private void rebuildRepetitions(){repetitions.clear();repetitions.put(new Chess().key(),1);for(String fen:fens)repetitions.merge(new Chess(fen).key(),1,Integer::sum);}
     private void save(){
         JSONArray entries=new JSONArray();
@@ -178,7 +80,7 @@ public final class MainActivity extends Activity {
             Records.Saved record=recordId==0?null:Records.get(this).find(recordId);
             if(record!=null)for(int i=0;i<feedback.size();i++){JSONObject entry=record.analyses().optJSONObject(Integer.toString(i));if(entry!=null){Feedback f=feedback.get(i);f.local=entry.optString("local",f.local);f.ai=entry.optString("aiText",f.ai);f.payload=entry.optJSONObject("payload");f.details=entry.optJSONObject("details");}}
         }catch(Exception e){game=new Chess();moves.clear();fens.clear();feedback.clear();save();}
-        rebuildRepetitions();restoreEvaluation();refresh();
+        rebuildRepetitions();restoreEvaluation();focus=feedback.isEmpty()?-1:Math.max(0,feedback.size()-(game.white?2:1));refresh();
     }
     private void restoreEvaluation(){
         trend.clear();String label="백 기준 평가 · 분석 대기";
@@ -191,28 +93,8 @@ public final class MainActivity extends Activity {
         }
         evaluation.setText(label);
     }
-    private EditText field(LinearLayout form,String title,String value){form.addView(text(title,13,MUTED));EditText e=new EditText(this);e.setTextColor(INK);e.setSingleLine(true);e.setText(value);form.addView(e);return e;}
-    private void settings() {
-        LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(dp(20),dp(8),dp(20),dp(8));
-        form.addView(text("대국 난이도 · 분석 엔진은 항상 최강",13,MUTED));Spinner difficulty=new Spinner(this);List<String> labels=new ArrayList<>();for(var d:Difficulty.values())labels.add(d.label);difficulty.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,labels));difficulty.setSelection(Difficulty.from(prefs.getString("difficulty","ELO_1600")).ordinal());form.addView(difficulty);
-        form.addView(text("Elo는 엔진의 목표 설정값입니다. 실전 사이트 레이팅과 다르며 기기·시간에 따라 달라집니다.",11,MUTED));
-        form.addView(text("본인 PC/서버에서 codex login으로 로그인한 뒤 서버를 연결하세요. OAuth 토큰은 휴대폰으로 전송하지 않습니다.",14,MUTED));
-        EditText url=field(form,"설명 서버 HTTPS 주소",prefs.getString("endpoint",""));EditText token=field(form,"페어링 토큰 (비우면 기존 값 유지)","");token.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        form.addView(text("설명 모델 (서버에서 허용한 모델)",13,MUTED));Spinner spinner=new Spinner(this);
-        List<String> models=new ArrayList<>();String stored=prefs.getString("models","");if(!stored.trim().isEmpty())models.addAll(Arrays.asList(stored.split(",")));if(models.isEmpty())models.add("서버 연결 후 선택");
-        ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,models);spinner.setAdapter(adapter);int selected=models.indexOf(prefs.getString("model",""));if(selected>=0)spinner.setSelection(selected);form.addView(spinner);
-        TextView testStatus=text("",13,MUTED);form.addView(testStatus);
-        Button test=button("저장하고 연결 · 모델 목록 확인",()->{
-            try {CoachClient.validateEndpoint(url.getText().toString().trim());if(!token.getText().toString().trim().isEmpty())client.saveToken(token.getText().toString().trim());prefs.edit().putString("endpoint",url.getText().toString().trim()).apply();}
-            catch(Exception e){testStatus.setText(e.getMessage());return;}
-            testStatus.setText("연결 확인 중…");coachJobs.submit(()->{
-                try {JSONObject response=client.request("/v1/models",null);JSONObject auth=client.request("/v1/auth/status",null);JSONArray list=response.getJSONArray("models");List<String> available=new ArrayList<>();for(int i=0;i<list.length();i++)available.add(list.getString(i));if(available.isEmpty())throw new Exception("서버에 모델이 없습니다");
-                    runOnUiThread(()->{models.clear();models.addAll(available);adapter.notifyDataSetChanged();int index=models.indexOf(prefs.getString("model",response.optString("defaultModel")));spinner.setSelection(Math.max(0,index));prefs.edit().putString("models",String.join(",",available)).apply();testStatus.setText(auth.optBoolean("signedIn")?"서버 연결 · Codex OAuth 로그인 확인 완료":"서버 연결됨 · 서버에서 Codex OAuth 로그인이 필요합니다");});
-                }catch(Exception e){runOnUiThread(()->testStatus.setText("연결 실패 · "+e.getMessage()));}
-            });
-        });form.addView(test);
-        ScrollView view=new ScrollView(this);view.addView(form);
-        new AlertDialog.Builder(this).setTitle("대국 및 Codex 설정").setView(view).setPositiveButton("완료",(d,w)->{prefs.edit().putString("difficulty",Difficulty.values()[difficulty.getSelectedItemPosition()].name()).apply();if(!models.get(0).equals("서버 연결 후 선택"))prefs.edit().putString("model",models.get(spinner.getSelectedItemPosition())).apply();refresh();}).setNeutralButton("연결 해제",(d,w)->prefs.edit().remove("endpoint").remove("token").remove("iv").apply()).setNegativeButton("닫기",null).show();
-    }
-    @Override protected void onDestroy(){destroyed=true;generation++;engineJobs.shutdownNow();coachJobs.shutdownNow();if(engine!=null)engine.close();if(opponent!=null)opponent.close();super.onDestroy();}
+    private void closeEngines(){if(engine!=null)engine.close();if(opponent!=null)opponent.close();engine=null;opponent=null;}
+    @Override protected void onStart(){super.onStart();if(parked){parked=false;connectEngine();}if(modelChip!=null){renderFeedback();if(focus>=0)requestExplanation(feedback.get(focus),generation);}}
+    @Override protected void onStop(){parked=true;super.onStop();if(!destroyed)engineJobs.submit(()->{if(parked)closeEngines();});}
+    @Override protected void onDestroy(){destroyed=true;generation++;engineJobs.shutdownNow();coachJobs.shutdownNow();closeEngines();super.onDestroy();}
 }
