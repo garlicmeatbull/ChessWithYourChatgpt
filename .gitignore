@@ -1,0 +1,14 @@
+.gradle/
+**/build/
+local.properties
+app/src/main/jniLibs/
+vendor/stockfish/src/*.nnue
+vendor/stockfish/src/*.o
+vendor/stockfish/src/.depend
+vendor/stockfish/src/stockfish*
+companion/node_modules/
+companion/.env
+companion/.cache/
+*.apk
+*.keystore
+artifacts/

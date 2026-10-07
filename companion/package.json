@@ -1,0 +1,15 @@
+{
+  "name": "chess-coach-companion",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@openai/codex-sdk": "0.160.1"
+  }
+}

@@ -1,0 +1,44 @@
+name: Native Android
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: companion/package-lock.json
+      - name: Android toolchain
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+      - name: Dependencies and native engines
+        run: |
+          npm ci --prefix companion
+          bash scripts/build-stockfish.sh
+          bash scripts/build-host-stockfish.sh
+      - name: Rules, PGN, engine and server checks
+        run: bash scripts/test-core.sh app/build/stockfish/host/src/stockfish
+      - name: Build and lint
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest assembleRelease lintDebug
+      - name: Corresponding source with NNUE
+        run: python3 scripts/package-source.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChessCoach-Android-and-source
+          if-no-files-found: error
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            artifacts/ChessCoach-0.1.0-source.zip
