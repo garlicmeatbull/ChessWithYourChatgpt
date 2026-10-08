@@ -56,8 +56,7 @@ public final class ReviewActivity extends Activity {
     }
     private void ensureEngine()throws Exception {if(engine==null)engine=new Stockfish(getApplicationInfo().nativeLibraryDir+"/libstockfish.so");}
     private void show(int ply){
-        reviewScroll.smoothScrollTo(0,0);index=Math.max(0,Math.min(game.plies().size(),ply));board.board=new Chess(index==0?game.initial():game.plies().get(index-1).after());board.lastFrom=board.lastTo=-1;
-        if(index>0){Chess.Move m=Chess.Move.parse(game.plies().get(index-1).uci());board.lastFrom=m.from();board.lastTo=m.to();}
+        reviewScroll.smoothScrollTo(0,0);index=Math.max(0,Math.min(game.plies().size(),ply));board.board=new Chess(index==0?game.initial():game.plies().get(index-1).after());board.setLastMove(index>0?Chess.Move.parse(game.plies().get(index-1).uci()):null);
         board.judgment=MoveJudgment.Kind.UNKNOWN;board.judgedSquare=-1;board.recommendation=null;board.playedArrow=null;
         board.invalidate();position.setText(index==0?"시작 국면":index+" / "+game.plies().size()+" 반수 · "+label(index-1));
         SpannableStringBuilder notation=new SpannableStringBuilder();
@@ -77,8 +76,8 @@ public final class ReviewActivity extends Activity {
         if(e==null){feedback.setText("아직 분석하지 않은 수예요. ‘이 수 해설’ 또는 전체 분석을 선택하세요.");return;}
         feedback.setText(e.optString("local","저장된 분석"));
         try{var p=game.plies().get(index-1);JSONObject detail=e.getJSONObject("details");var a=AnalysisJson.analysis(detail.getJSONObject("analysis"));var actual=detail.isNull("playedScore")?null:AnalysisJson.line(detail.getJSONObject("playedScore"));var judgment=MoveJudgment.assess(new Chess(p.before()),p.uci(),a,actual);board.judgment=judgment.kind();board.judgedSquare=Chess.Move.parse(p.uci()).to();feedback.setText(judgment.kind().symbol+" "+judgment.kind().label+" · "+judgment.reason());
-            if(recommendation){board.board=new Chess(p.before());board.recommendation=a.best();board.playedArrow=p.uci();board.judgedSquare=-1;position.setText(label(index-1)+" · 착수 전 추천 이동");}
-            for(var line:a.lines()){if(line.pv().isEmpty())continue;String uci=line.pv().get(0),san=new Chess(p.before()).san(Chess.Move.parse(uci));Button candidate=button("↗ "+san+"   "+line.score(),()->{board.board=new Chess(p.before());board.recommendation=uci;board.playedArrow=p.uci();board.judgedSquare=-1;board.invalidate();reviewScroll.smoothScrollTo(0,0);position.setText("착수 전 · 후보 "+san);});candidates.addView(candidate);}
+            if(recommendation){board.board=new Chess(p.before());board.setLastMove(index>1?Chess.Move.parse(game.plies().get(index-2).uci()):null);board.recommendation=a.best();board.playedArrow=p.uci();board.judgedSquare=-1;position.setText(label(index-1)+" · 착수 전 추천 이동");}
+            for(var line:a.lines()){if(line.pv().isEmpty())continue;String uci=line.pv().get(0),san=new Chess(p.before()).san(Chess.Move.parse(uci));Button candidate=button("↗ "+san+"   "+line.score(),()->{board.board=new Chess(p.before());board.setLastMove(index>1?Chess.Move.parse(game.plies().get(index-2).uci()):null);board.recommendation=uci;board.playedArrow=p.uci();board.judgedSquare=-1;board.invalidate();reviewScroll.smoothScrollTo(0,0);position.setText("착수 전 · 후보 "+san);});candidates.addView(candidate);}
             board.invalidate();
         }catch(Exception ignored){}
     }

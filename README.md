@@ -1,9 +1,10 @@
 # Chess Coach
 
-체스를 두면서 Stockfish의 추천 수와 그 근거를 복기하는 **네이티브 Android 앱**입니다. Java Activity/View/Canvas를 사용하며 Android 8.1(API 27) 이상 ARM64 기기를 우선 지원합니다. iOS 구현은 포함하지 않습니다. 현재 버전은 화면과 탐색 흐름을 재설계한 0.2.0입니다.
+체스를 두면서 Stockfish의 추천 수와 그 근거를 복기하는 **네이티브 Android 앱**입니다. Java Activity/View/Canvas를 사용하며 Android 8.1(API 27) 이상 ARM64 기기를 우선 지원합니다. iOS 구현은 포함하지 않습니다. 현재 버전은 직전 수 표시를 개선한 0.2.1입니다.
 
 ## 사용할 수 있는 기능
 
+- 직전 수의 출발·도착 칸을 같은 노란색으로 표시하고 평가 배지를 함께 보여줍니다. 복기·추천 미리보기에서도 표시 중인 국면의 마지막 실전 이동을 따라갑니다.
 - 홈 → 상대 난이도 → 대국, 홈 → 기록 → 기록 추가로 분리한 화면. 상단 AI 코치와 대국 중 모델 선택, 채움 벡터 기물, 판 위 색상·기호·추천 화살표를 지원합니다.
 - 오프라인 Stockfish 19 대국, 시스템을 따르는 화이트/다크 모드.
 - 상대 난이도: 입문 Skill 0, 목표 Elo 1320·1600·2000·2400·2800·3190, 제한 없는 최강. 분석 엔진은 별도 프로세스로 항상 Skill 20과 실력 제한 해제를 유지합니다. 목표 Elo는 다른 서비스의 사용자 레이팅과 직접 비교할 수 없습니다.
@@ -30,7 +31,7 @@ bash scripts/build-stockfish.sh
 
 GitHub에 push하면 `Native Android` Actions가 APK와 대응 소스를 같은 다운로드 artifact로 만들도록 설정했습니다. 성공한 실행의 `ChessCoach-Android-and-source` artifact에서 APK와 대응 소스를 함께 받을 수 있습니다. 빌드 상태는 저장소의 Actions에서 확인하세요.
 
-Actions 다운로드에는 `ChessCoach-0.2.0.apk`와 대응 소스 ZIP을 평평한 구조로 제공합니다. 개발 APK의 키는 각 CI 실행에서 생성하므로 이전 APK와 서명 불일치 시 앱 삭제 후 재설치가 필요합니다. 삭제 전 필요한 대국의 PGN을 복사하세요. PGN에는 AI 해설과 분석 캐시가 포함되지 않습니다. 동일한 개발 키로 업데이트하려면 Android 기본 개발 키 형식의 keystore를 base64로 인코딩해 저장소의 `CHESS_DEBUG_KEYSTORE_BASE64` Actions secret에 설정할 수 있습니다. 서명 키는 저장소·artifact·공개 캐시에 포함하지 않습니다. 정식 배포에는 보관하는 릴리스 키를 사용하세요.
+Actions 다운로드에는 `ChessCoach-0.2.1.apk`와 대응 소스 ZIP을 평평한 구조로 제공합니다. 개발 APK의 키는 각 CI 실행에서 생성하므로 이전 APK와 서명 불일치 시 앱 삭제 후 재설치가 필요합니다. 삭제 전 필요한 대국의 PGN을 복사하세요. PGN에는 AI 해설과 분석 캐시가 포함되지 않습니다. 동일한 개발 키로 업데이트하려면 Android 기본 개발 키 형식의 keystore를 base64로 인코딩해 저장소의 `CHESS_DEBUG_KEYSTORE_BASE64` Actions secret에 설정할 수 있습니다. 서명 키는 저장소·artifact·공개 캐시에 포함하지 않습니다. 정식 배포에는 보관하는 릴리스 키를 사용하세요.
 
 설치 가능한 개발 APK: `app/build/outputs/apk/debug/app-debug.apk`. `adb install -r` 또는 Android Studio로 설치합니다. `assembleRelease`도 지원하지만 실제 배포에는 **본인이 보관하는 릴리스 서명 키**가 필요합니다. 개발용 서명 키는 저장소에 넣지 않습니다.
 
@@ -45,6 +46,8 @@ bash scripts/setup-cloud.sh
 ## OAuth 해설 연결
 
 현재 구현은 안드로이드 앱이 본인 PC/서버의 companion에 연결하는 방식입니다. **폰 단독 ChatGPT 로그인은 구현하지 않았습니다.** 공개되지 않은 소비자 OAuth API를 직접 호출하는 대신 공식 Codex CLI/SDK가 계정 인증을 처리합니다. ChatGPT/Codex 계정, 이용 가능한 모델과 계정 한도가 필요합니다.
+
+중계 서버 없는 네이티브 OAuth는 제공자가 지원하는 앱 등록과 인증 API를 전제로, 시스템 브라우저 로그인 → PKCE 인증 코드 → 앱 복귀 링크 → 토큰 교환 순서로 구현합니다. 토큰은 Keystore로 암호화해 저장하고 앱에서 직접 해설을 요청해야 합니다. 현재 공식 Codex CLI의 기기 인증은 **CLI가 실행되는 기기**를 로그인시키므로, 브라우저만 휴대폰에서 연다고 서버를 제거할 수는 없습니다. 이 앱에 사용할 공개적으로 지원되는 Android용 ChatGPT 구독 OAuth 연동은 확인하지 못했습니다. 직접 OpenAI API를 호출하는 대안은 서버 없이 구현할 수 있지만 API 키가 필요하고 ChatGPT 구독과 별도로 과금됩니다. 현재 앱은 해당 유료 API 방식으로 전환하지 않습니다.
 
 ```sh
 cd companion
@@ -91,4 +94,4 @@ APK를 공유할 때 대응 소스도 함께 제공하세요. 다음 명령은 G
 python3 scripts/package-source.py
 ```
 
-출력은 `artifacts/ChessCoach-0.2.0-source.zip`입니다. 생성한 바이너리·가중치·캐시·자격 증명은 Git에 포함하지 않습니다.
+출력은 `artifacts/ChessCoach-0.2.1-source.zip`입니다. 생성한 바이너리·가중치·캐시·자격 증명은 Git에 포함하지 않습니다.
