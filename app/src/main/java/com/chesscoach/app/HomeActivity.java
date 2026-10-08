@@ -7,9 +7,9 @@ public final class HomeActivity extends Activity {
     private TextView connection;
     private AlertDialog coachingIntro;
     private boolean introShown;
-    @Override public void onCreate(Bundle state){super.onCreate(state);LinearLayout root=Ui.screen(this,true);Ui.gap(root,20);TextView brand=Ui.text(this,"CHESS COACH",12,true);brand.setTextColor(getColor(R.color.muted));root.addView(brand);Ui.gap(root,12);root.addView(Ui.text(this,"한 수씩, 더 깊게.",32,true));Ui.gap(root,8);root.addView(Ui.text(this,"두고, 이해하고, 다음 수를 발견하세요.",15,false));Ui.gap(root,32);
-        LinearLayout play=Ui.card(this);play.addView(Ui.text(this,"01  PLAY",12,true));Ui.gap(play,12);play.addView(Ui.text(this,"Stockfish와 대국",24,true));Ui.gap(play,8);play.addView(Ui.text(this,"나에게 맞는 난이도로 대국하고\n방금 둔 수의 평가와 조언을 받아요.",15,false));Ui.gap(play,20);play.addView(Ui.primary(this,"난이도 선택하고 시작  →",()->startActivity(new Intent(this,GameSetupActivity.class))));root.addView(play);Ui.gap(root,16);
-        LinearLayout records=Ui.card(this);records.addView(Ui.text(this,"02  REVIEW",12,true));Ui.gap(records,12);records.addView(Ui.text(this,"나의 대국 기록",24,true));Ui.gap(records,8);records.addView(Ui.text(this,"직접 둔 대국과 가져온 기보를 함께.\n하이라이트로 성장할 국면을 다시 봐요.",15,false));Ui.gap(records,20);records.addView(Ui.button(this,"기록 살펴보기  →",()->startActivity(new Intent(this,RecordsActivity.class))));root.addView(records);Ui.gap(root,20);
+    @Override public void onCreate(Bundle state){super.onCreate(state);LinearLayout root=Ui.screen(this,true);Ui.gap(root,20);TextView brand=Ui.text(this,"CHESS COACH",12,true);brand.setTextColor(getColor(R.color.muted));root.addView(brand);Ui.gap(root,12);root.addView(Ui.text(this,"다음 수가 보이는 체스.",32,true));Ui.gap(root,8);root.addView(Ui.text(this,"차분하게 두고, 한 수의 이유를 이해하세요.",15,false));Ui.gap(root,32);
+        LinearLayout play=Ui.card(this);TextView playTag=Ui.text(this,"대국",12,true);playTag.setTextColor(getColor(R.color.accent));play.addView(playTag);Ui.gap(play,12);play.addView(Ui.text(this,"Stockfish와 대국",24,true));Ui.gap(play,8);play.addView(Ui.text(this,"나에게 맞는 난이도로 대국하고\n방금 둔 수의 평가와 조언을 받아요.",15,false));Ui.gap(play,20);play.addView(Ui.primary(this,"난이도 선택하고 시작  →",()->startActivity(new Intent(this,GameSetupActivity.class))));root.addView(play);Ui.gap(root,16);
+        LinearLayout records=Ui.card(this);TextView reviewTag=Ui.text(this,"복기",12,true);reviewTag.setTextColor(getColor(R.color.accent));records.addView(reviewTag);Ui.gap(records,12);records.addView(Ui.text(this,"나의 대국 기록",24,true));Ui.gap(records,8);records.addView(Ui.text(this,"직접 둔 대국과 가져온 기보를 함께.\n하이라이트로 성장할 국면을 다시 봐요.",15,false));Ui.gap(records,20);records.addView(Ui.button(this,"기록 살펴보기  →",()->startActivity(new Intent(this,RecordsActivity.class))));root.addView(records);Ui.gap(root,20);
         connection=Ui.text(this,"",14,false);connection.setTextColor(getColor(R.color.muted));root.addView(connection);root.addView(Ui.button(this,"AI 코치 연결 · 모델",()->startActivity(new Intent(this,ConnectionActivity.class))));Ui.gap(root,12);root.addView(Ui.button(this,"오픈소스 라이선스",this::license));
     }
     @Override public void onResume(){super.onResume();connection.setText(!ChatGptAccounts.connected(this)?"Stockfish는 오프라인으로 이용할 수 있어요.":"선택한 코치 · "+Ui.modelLabel(this));showCoachingIntro();}
@@ -33,8 +33,7 @@ public final class HomeActivity extends Activity {
         }),new LinearLayout.LayoutParams(-1,Ui.dp(this,52)));
         Ui.gap(content,8);
         TextView skip=Ui.text(this,"괜찮아요, 연결 없이 사용할게요",13,false);
-        boolean night=(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;
-        skip.setTextColor(night?0xFFB7B7B7:0xFF666666);
+        skip.setTextColor(getColor(R.color.muted));
         skip.setGravity(android.view.Gravity.CENTER);
         skip.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x22888888),null,null));
         skip.setOnClickListener(v->{prefs.edit().putBoolean("coachingIntroDone",true).apply();coachingIntro.dismiss();});
