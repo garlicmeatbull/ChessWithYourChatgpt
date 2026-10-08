@@ -1,10 +1,10 @@
 # Chess Coach
 
-체스를 두면서 Stockfish의 추천 수와 그 근거를 복기하는 **네이티브 Android 앱**입니다. Java Activity/View/Canvas를 사용하며 Android 8.1(API 27) 이상 ARM64 기기를 우선 지원합니다. iOS 구현은 포함하지 않습니다. 현재 버전은 AI 요약 스트리밍과 필요할 때 생성하는 상세 설명을 추가한 0.4.0입니다.
+체스를 두면서 Stockfish의 추천 수와 그 근거를 복기하는 **네이티브 Android 앱**입니다. Java Activity/View/Canvas를 사용하며 Android 8.1(API 27) 이상 ARM64 기기를 우선 지원합니다. iOS 구현은 포함하지 않습니다. 현재 버전은 AI 핵심 이유와 짧은 설명을 위아래로 나누는 0.4.1입니다.
 
 ## 사용할 수 있는 기능
 
-- AI 조언은 생성되는 대로 표시합니다. 상단에서는 두 문장 안팎의 짧은 요약을 읽고, **자세히 보기**를 누르면 같은 Stockfish 근거로 상세 설명을 생성합니다. 요약과 상세 설명은 모델별로 함께 저장해 다시 열 때 재사용합니다. 상세 생성은 추가 구독 사용량을 소비합니다. 제목·굵게·기울임·목록·수 표기용 인라인 코드의 마크다운 서식을 네이티브 텍스트로 표시합니다.
+- AI 조언은 생성되는 대로 표시합니다. 상단에서는 **핵심 원인 한 줄**을 먼저 읽고, 바로 아래에서 위협·대응을 짧게 확인한 뒤, **자세히 보기**를 누르면 같은 Stockfish 근거로 상세 설명을 생성합니다. 요약과 상세 설명은 모델별로 함께 저장해 다시 열 때 재사용합니다. 상세 생성은 추가 구독 사용량을 소비합니다. 제목·굵게·기울임·목록·수 표기용 인라인 코드의 마크다운 서식을 네이티브 텍스트로 표시합니다.
 
 - 처음 홈을 열면 AI 코칭을 위한 계정·모델 연결 안내가 나타납니다. 연결 버튼은 ChatGPT 연결 화면을 열고, 작은 회색 **괜찮아요, 연결 없이 사용할게요**를 누르면 이 설치에서는 안내가 다시 나타나지 않습니다. 나중에도 홈의 **AI 코치 연결 · 모델**에서 연결할 수 있습니다. 계정과 모델 연결을 마친 사용자에게도 안내를 반복하지 않습니다.
 
@@ -35,7 +35,7 @@ bash scripts/build-stockfish.sh
 
 GitHub에 push하면 `Native Android` Actions가 APK와 대응 소스를 같은 다운로드 artifact로 만들도록 설정했습니다. 성공한 실행의 `ChessCoach-Android-and-source` artifact에서 APK와 대응 소스를 함께 받을 수 있습니다. 빌드 상태는 저장소의 Actions에서 확인하세요.
 
-Actions 다운로드에는 `ChessCoach-0.4.0.apk`와 대응 소스 ZIP을 평평한 구조로 제공합니다. 개발 APK의 키는 각 CI 실행에서 생성하므로 이전 APK와 서명 불일치 시 앱 삭제 후 재설치가 필요합니다. 삭제 전 필요한 대국의 PGN을 복사하세요. PGN에는 AI 해설과 분석 캐시가 포함되지 않습니다. 동일한 개발 키로 업데이트하려면 Android 기본 개발 키 형식의 keystore를 base64로 인코딩해 저장소의 `CHESS_DEBUG_KEYSTORE_BASE64` Actions secret에 설정할 수 있습니다. 서명 키는 저장소·artifact·공개 캐시에 포함하지 않습니다. 정식 배포에는 보관하는 릴리스 키를 사용하세요.
+Actions 다운로드에는 `ChessCoach-0.4.1.apk`와 대응 소스 ZIP을 평평한 구조로 제공합니다. 개발 APK의 키는 각 CI 실행에서 생성하므로 이전 APK와 서명 불일치 시 앱 삭제 후 재설치가 필요합니다. 삭제 전 필요한 대국의 PGN을 복사하세요. PGN에는 AI 해설과 분석 캐시가 포함되지 않습니다. 동일한 개발 키로 업데이트하려면 Android 기본 개발 키 형식의 keystore를 base64로 인코딩해 저장소의 `CHESS_DEBUG_KEYSTORE_BASE64` Actions secret에 설정할 수 있습니다. 서명 키는 저장소·artifact·공개 캐시에 포함하지 않습니다. 정식 배포에는 보관하는 릴리스 키를 사용하세요.
 
 설치 가능한 개발 APK: `app/build/outputs/apk/debug/app-debug.apk`. `adb install -r` 또는 Android Studio로 설치합니다. `assembleRelease`도 지원하지만 실제 배포에는 **본인이 보관하는 릴리스 서명 키**가 필요합니다. 개발용 서명 키는 저장소에 넣지 않습니다.
 
@@ -91,4 +91,4 @@ APK를 공유할 때 대응 소스도 함께 제공하세요. 다음 명령은 G
 python3 scripts/package-source.py
 ```
 
-출력은 `artifacts/ChessCoach-0.4.0-source.zip`입니다. 생성한 바이너리·가중치·캐시·자격 증명은 Git에 포함하지 않습니다.
+출력은 `artifacts/ChessCoach-0.4.1-source.zip`입니다. 생성한 바이너리·가중치·캐시·자격 증명은 Git에 포함하지 않습니다.

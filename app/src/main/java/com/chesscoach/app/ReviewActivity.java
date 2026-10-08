@@ -84,11 +84,12 @@ public final class ReviewActivity extends Activity {
     }
     private void renderCoach(JSONObject e,JSONObject ai,String model){
         Pending job=index>0?pending.get(index-1):null;boolean streaming=job!=null&&model.equals(job.model);
-        String summary=ai!=null?CoachText.summary(ai):streaming&&!job.detail&&!job.text.isEmpty()?job.text:streaming?"이번 수의 핵심 조언을 준비하고 있어요…":"AI 코치를 연결하면 이 수의 조언을 볼 수 있어요. 연결 후 ‘이 수 해설’을 눌러주세요.";
+        String summary=ai!=null?CoachText.summary(ai):streaming&&!job.detail&&!job.text.isEmpty()?CoachText.previewSummary(job.text):streaming?"이번 수의 핵심 조언을 준비하고 있어요…":"AI 코치를 연결하면 이 수의 조언을 볼 수 있어요. 연결 후 ‘이 수 해설’을 눌러주세요.";
+        String core=ai!=null?CoachText.headline(ai):streaming&&!job.detail?CoachText.previewHeadline(job.text):"";
         String full=streaming&&job.detail&&!job.text.isEmpty()?job.text:ai!=null?CoachText.markdown(ai):summary;
         if(e!=null&&!e.optString("local").isEmpty())full+="\n\n## Stockfish 평가\n"+e.optString("local");
         if(e!=null&&!streaming&&!CoachText.detailed(ai)&&model.equals(e.optString("detailErrorModel")))full+="\n\n"+e.optString("detailError");
-        coachPanel.bind(model+":"+index,summary,full,streaming,ai!=null,()->{if(index>0)requestExplanation(index-1,true,true);});
+        coachPanel.bind(model+":"+index,core,summary,full,streaming,ai!=null,()->{if(index>0)requestExplanation(index-1,true,true);});
     }
     private JSONObject analyzePly(int ply)throws Exception {
         JSONObject saved=entry(ply);if(saved!=null&&saved.has("details")&&saved.has("payload"))return saved;

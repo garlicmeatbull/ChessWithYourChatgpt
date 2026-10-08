@@ -26,6 +26,29 @@ public class CoachTextTest {
         String raw="{\"flow\":\"중앙을 지키세요\",\"bestMoveReason\":\"전개가 빨라";
         assertEquals("## 이번 수의 판단\n중앙을 지키세요\n\n## 추천수의 근거\n전개가 빨라",CoachText.partial(raw));
     }
+    @Test public void coreAppearsBeforeItsShortExplanationAtEveryBoundary()throws Exception{
+        String core="포크로 퀸을 잃어요",body="나이트의 체크와 퀸 공격을 함께 확인하세요.";
+        String wire="{\"headline\":\""+core+"\",\"summary\":\""+body+"\"}";
+        for(int i=0;i<=wire.length();i++){
+            String preview=CoachText.partial(wire.substring(0,i));
+            assertTrue(core.startsWith(CoachText.previewHeadline(preview)));
+            assertTrue(body.startsWith(CoachText.previewSummary(preview)));
+        }
+        String reversed="{\"summary\":\""+body+"\",\"headline\":\""+core+"\"}";
+        assertEquals(core,CoachText.previewHeadline(CoachText.partial(reversed)));
+        assertEquals(body,CoachText.previewSummary(CoachText.partial(reversed)));
+        assertEquals("a",CoachText.previewHeadline("## 핵심\na\n\nb"));
+        assertEquals("b",CoachText.previewSummary("## 핵심\na\n\nb"));
+    }
+    @Test public void coreSurvivesDetailMergeAndLegacySummariesHaveNoInventedCore()throws Exception{
+        JSONObject brief=response(new JSONObject().put("headline","수비 기물을 놓쳤어요").put("summary","상대의 공격을 먼저 확인하세요."),30);
+        JSONObject detail=response(new JSONObject().put("flow","판단").put("bestMoveReason","근거").put("plan","계획"),100);
+        JSONObject merged=cache(CoachText.merge(CoachText.merge(null,brief),detail));
+        assertEquals("수비 기물을 놓쳤어요",CoachText.headline(merged));
+        assertEquals("상대의 공격을 먼저 확인하세요.",CoachText.summary(merged));
+        assertTrue(CoachText.markdown(merged).startsWith("## 핵심\n수비 기물을 놓쳤어요\n\n## 요약\n"));
+        assertEquals("",CoachText.headline(cache(response(new JSONObject().put("summary","이전 요약"),20))));
+    }
     @Test public void summaryAndDetailMergePreservesBothUsageRecords()throws Exception{
         JSONObject summary=response(new JSONObject().put("summary","짧은 조언"),25);
         JSONObject detail=response(new JSONObject().put("flow","판단").put("bestMoveReason","근거").put("plan","계획"),130);

@@ -6,7 +6,7 @@
 
 앱은 생성된 해설을 대국/반수/모델별로 SQLite에 저장해 같은 모델의 해설을 다시 볼 때 재호출하지 않습니다. 모델을 바꾸면 새 해설을 생성하고 이전 해설도 유지합니다. 직접 대국은 매 반수에, 가져온 대국은 전체 분석을 선택했을 때 수별 요청을 순서대로 보냅니다. 중단 시 완료된 분석·해설은 남으며 재실행은 저장된 결과를 재사용합니다.
 
-Responses 요청은 `store:false`, `stream:true`이며 전체 PGN 대신 FEN 두 개·상위 후보 3개·6반수 이하 PV·짧은 평가 추세를 전송합니다. 기본 요청은 핵심 판단과 추천 행동 두 문장, 140자 이내의 `summary` JSON을 요구합니다. **자세히 보기**를 누른 경우에만 같은 분석 근거로 650자 이내의 `flow`, `bestMoveReason`, `plan` JSON을 추가 생성합니다. 기존 상세 설명은 추가 요청 없이 표시합니다. 요약과 상세를 모델별로 병합해 저장하고 두 요청의 usage도 각각 보존합니다. 에이전트 런타임·파일·셸·도구·이전 코딩 세션을 해설에 포함하지 않습니다. preview에서 허용하지 않는 `max_output_tokens`, `temperature`, `previous_response_id`도 전송하지 않습니다. 실제 완료 응답의 usage 객체를 기록에 남깁니다.
+Responses 요청은 `store:false`, `stream:true`이며 전체 PGN 대신 FEN 두 개·상위 후보 3개·6반수 이하 PV·짧은 평가 추세를 전송합니다. 기본 요청은 핵심 원인 한 줄(26자 이내)의 `headline`과 위협·대응을 짧게 설명하는 `summary`(100자 이내)를 함께 받습니다. 앱의 수 평가도 자료로 전달해 블런더 같은 평가의 원인을 먼저 설명하도록 합니다. 두 필드는 한 요청에서 생성하므로 핵심 줄 때문에 별도 요청을 추가하지 않습니다. **자세히 보기**를 누른 경우에만 같은 분석 근거로 650자 이내의 `flow`, `bestMoveReason`, `plan` JSON을 추가 생성합니다. 기존 상세 설명은 추가 요청 없이 표시합니다. 요약과 상세를 모델별로 병합해 저장하고 두 요청의 usage도 각각 보존합니다. 에이전트 런타임·파일·셸·도구·이전 코딩 세션을 해설에 포함하지 않습니다. preview에서 허용하지 않는 `max_output_tokens`, `temperature`, `previous_response_id`도 전송하지 않습니다. 실제 완료 응답의 usage 객체를 기록에 남깁니다.
 
 [공식 Sign in with ChatGPT 사례](https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt)는 직접 모델 조회·Responses 스트리밍을 사용합니다. [Prompt Caching 101](https://github.com/openai/openai-cookbook/blob/main/examples/Prompt_Caching101.ipynb)을 참고해 고정 지침을 가변 엔진 자료 앞에 두되, 캐시를 맞추려고 짧은 요청을 인위적으로 늘리지 않습니다. 일반 API의 비용 할인과 ChatGPT 구독 사용량 절감을 동일시하지 않습니다.
 

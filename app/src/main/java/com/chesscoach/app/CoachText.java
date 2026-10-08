@@ -4,8 +4,8 @@ import org.json.*;
 
 /** Presentation of both saved legacy explanations and incomplete streamed JSON strings. */
 public final class CoachText {
-    private static final String[] KEYS={"summary","flow","bestMoveReason","plan"};
-    private static final String[] TITLES={"요약","이번 수의 판단","추천수의 근거","다음 계획"};
+    private static final String[] KEYS={"headline","summary","flow","bestMoveReason","plan"};
+    private static final String[] TITLES={"핵심","요약","이번 수의 판단","추천수의 근거","다음 계획"};
     public static String partial(String json){
         StringBuilder out=new StringBuilder();
         for(int i=0;i<KEYS.length;i++){
@@ -45,6 +45,9 @@ public final class CoachText {
     }
     private static int endQuote(String s,int p){for(;p<s.length();p++){if(s.charAt(p)=='\\')p++;else if(s.charAt(p)=='"')return p;}return -1;}
     public static JSONObject explanation(JSONObject cache){JSONObject response=cache==null?null:cache.optJSONObject("response");return response==null?null:response.optJSONObject("explanation");}
+    public static String headline(JSONObject cache){JSONObject e=explanation(cache);return e==null?"":e.optString("headline").replace('\n',' ').trim();}
+    public static String previewHeadline(String preview){String prefix="## 핵심\n";if(!preview.startsWith(prefix))return "";int end=preview.indexOf("\n\n",prefix.length());return preview.substring(prefix.length(),end<0?preview.length():end).replace('\n',' ').trim();}
+    public static String previewSummary(String preview){String prefix="## 핵심\n";if(!preview.startsWith(prefix))return preview;int end=preview.indexOf("\n\n",prefix.length());return end<0?"":preview.substring(end+2);}
     public static JSONObject merge(JSONObject previous,JSONObject incoming)throws JSONException{
         JSONObject result=new JSONObject(incoming.toString()),fresh=incoming.optJSONObject("explanation");
         if(fresh==null)return result;

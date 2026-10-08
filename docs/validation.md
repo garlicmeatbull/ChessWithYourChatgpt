@@ -1,3 +1,10 @@
+# 0.4.1 핵심 원인·짧은 설명 검증 (2026-10-08)
+
+- `testDebugUnitTest assembleDebug assembleRelease lintDebug`: 성공. JVM 29개(프로토콜 17개 + 코칭 12개), 실패/오류/스킵 0.
+- 새 검사: 모든 스트리밍 경계와 반대 필드 생성 순서에서도 핵심·본문을 분리, 상세 병합 후 핵심 유지, 이전 요약에 핵심을 임의로 만들지 않는 호환성.
+- 새 조언은 `headline`, `summary`를 한 요청에서 받습니다. 핵심은 굵은 별도 텍스트로 표시하고, 실제 앱 수 평가를 근거 자료로 전달합니다.
+- 이번 변경의 실기기 표시·문장 품질과 응답 시간은 추가 확인 대상입니다. Android instrumentation은 이번에는 재실행하지 않았으며 아래 0.4.0 결과는 이전 버전 결과입니다.
+
 # 0.4.0 요약·상세 스트리밍 검증 (2026-10-08)
 
 - `testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug`: 성공. JVM 27개(기존 프로토콜 17개 + 새 코칭 10개), 실패/오류/스킵 0. Lint 오류 0, 경고 20.

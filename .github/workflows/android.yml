@@ -47,11 +47,11 @@ jobs:
       - name: Corresponding source with NNUE
         run: |
           python3 scripts/package-source.py
-          cp app/build/outputs/apk/debug/app-debug.apk artifacts/ChessCoach-0.4.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk artifacts/ChessCoach-0.4.1.apk
       - uses: actions/upload-artifact@v4
         with:
           name: ChessCoach-Android-and-source
           if-no-files-found: error
           path: |
-            artifacts/ChessCoach-0.4.0.apk
-            artifacts/ChessCoach-0.4.0-source.zip
+            artifacts/ChessCoach-0.4.1.apk
+            artifacts/ChessCoach-0.4.1-source.zip
