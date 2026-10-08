@@ -1,0 +1,22 @@
+[
+  {
+    "name": "nimbus-jose-jwt-10.5-sources.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/nimbusds/nimbus-jose-jwt/10.5/nimbus-jose-jwt-10.5-sources.jar",
+    "sha256": "8bbeaf8777a56f1f0efc70df60fcd6d416bfa4977aba3d00620b004af1f9d116"
+  },
+  {
+    "name": "gson-2.13.1-sources.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.13.1/gson-2.13.1-sources.jar",
+    "sha256": "3317b8662ebc2b7a5ff34af2214cd0f8d74d37a9fa9757be494ad8824e96eee7"
+  },
+  {
+    "name": "jcip-annotations-1.0-1-sources.jar",
+    "url": "https://repo.maven.apache.org/maven2/com/github/stephenc/jcip/jcip-annotations/1.0-1/jcip-annotations-1.0-1-sources.jar",
+    "sha256": "d60bb3bf4e03a5e405f9b16f4c2625de86089d6ce4f999bcc2548dcac090ae19"
+  },
+  {
+    "name": "nimbus-jose-jwt-10.5-pom.xml",
+    "url": "https://bitbucket.org/connect2id/nimbus-jose-jwt/raw/10.5/pom.xml",
+    "sha256": "de52e4d6f4312346450ebbef46c9afae36a0073c458013e8d8cf814e54fbe9e1"
+  }
+]

@@ -20,11 +20,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: companion/package-lock.json
       - name: Optional stable development signing identity
         env:
           CHESS_DEBUG_KEYSTORE_BASE64: ${{ secrets.CHESS_DEBUG_KEYSTORE_BASE64 }}
@@ -43,21 +38,20 @@ jobs:
         run: python3 scripts/bootstrap-cloud.py
       - name: Dependencies and native engines
         run: |
-          npm ci --prefix companion
           bash scripts/build-stockfish.sh
           bash scripts/build-host-stockfish.sh
-      - name: Rules, PGN, engine and server checks
+      - name: Rules, PGN and engine checks
         run: bash scripts/test-core.sh app/build/stockfish/host/src/stockfish
       - name: Build and lint
-        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest assembleRelease lintDebug
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug
       - name: Corresponding source with NNUE
         run: |
           python3 scripts/package-source.py
-          cp app/build/outputs/apk/debug/app-debug.apk artifacts/ChessCoach-0.2.1.apk
+          cp app/build/outputs/apk/debug/app-debug.apk artifacts/ChessCoach-0.3.0.apk
       - uses: actions/upload-artifact@v4
         with:
           name: ChessCoach-Android-and-source
           if-no-files-found: error
           path: |
-            artifacts/ChessCoach-0.2.1.apk
-            artifacts/ChessCoach-0.2.1-source.zip
+            artifacts/ChessCoach-0.3.0.apk
+            artifacts/ChessCoach-0.3.0-source.zip

@@ -10,8 +10,7 @@ export npm_config_cache=/workspace/toolchains/npm-cache
 if ! test -f .agents/skills/caveman/SKILL.md; then
     npx skills@latest add JuliusBrussee/caveman -a codex --yes
 fi
-npm ci --prefix companion
 bash scripts/build-stockfish.sh
 bash scripts/build-host-stockfish.sh
 bash scripts/test-core.sh app/build/stockfish/host/src/stockfish
-python3 scripts/gradle-cloud.py assembleDebug assembleDebugAndroidTest lintDebug
+python3 scripts/gradle-cloud.py testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug

@@ -12,6 +12,10 @@ Android Java Activity/View/Canvas로 구현하며 WebView나 웹 프론트엔드
 
 `RecordsActivity`가 두 출처를 같은 화면에서 보여주며 `ReviewActivity`에서 수순을 눌러 이동하거나 이전/다음으로 탐색합니다. 가져온 대국은 전체 Stockfish 분석 후 하이라이트를 생성합니다. 직접 둔 대국도 같은 전체 분석/하이라이트 버튼을 제공합니다. 이미 저장된 엔진 분석과 동일 모델의 해설은 재사용합니다. 복기 화면을 닫으면 진행 중 작업은 중단하며 완료된 결과는 남습니다. 작업 재개 버튼으로 이어갈 수 있습니다. 현재 버전은 분석 서비스를 백그라운드에서 무기한 실행하지 않습니다.
 
-설명은 본인 PC/서버의 공식 Codex OAuth 로그인과 SDK를 사용하는 companion으로 연결합니다. 폰에서 소비자 ChatGPT OAuth의 비공개 API를 호출하지 않습니다. 공식 기기 인증을 앱에서 시작해 기본 브라우저의 `auth.openai.com/codex/device`에서 일회용 코드를 입력합니다. `/v1/auth/device`는 별도 페어링 인증 후에만 사용할 수 있고 로그인 코드만 반환합니다. OAuth 토큰을 반환하거나 로그인 출력 원문을 노출하지 않습니다. 서버 모델 목록은 상단 모델 메뉴에서 선택하고 실제 접근 권한은 계정에 따릅니다. 전화기에는 Android Keystore로 암호화한 페어링 토큰만 저장합니다. 배포 빌드는 HTTPS를 요구하며 디버그 빌드의 에뮬레이터 루프백만 HTTP를 허용합니다. 클라우드/기기 이동 백업에서 DB와 페어링 정보는 제외됩니다.
+`ChatGptLoginService`는 로그인 중에만 foreground 알림과 `127.0.0.1` 수신기를 유지합니다. fresh state/nonce/PKCE를 메모리에 생성하고, 공식 동적 등록에서 받은 client ID로 코드를 교환합니다. `ChatGptProtocol`은 콜백·RS256/JWKS ID 토큰·허용 scope와 SSE 완료를 검증합니다. `ChatGptStore`는 전체 계정 기록을 Keystore AES-GCM으로 암호화해 AtomicFile로 교체합니다. `ChatGptAccounts`는 계정별 등록, 단일화한 토큰 갱신, 모델 목록, 로그아웃을 처리합니다. 네트워크 갱신 중에도 UI의 계정 조회를 막지 않으며 계정 변경·로그아웃 뒤 늦게 도착한 결과는 버립니다.
+
+`CoachClient`가 공개 `https://api.openai.com/v1/responses`를 OAuth bearer로 직접 호출합니다. `store:false`, `stream:true`, stateless input과 짧은 엔진 근거를 보내며 `response.completed` 없이 끝난 응답은 DB에 저장하지 않습니다. `/v1/models`의 표시용 모델만 사용합니다. 서버, Codex CLI, 비공개 backend-api, API 키와 별도 API 과금 경로는 사용하지 않습니다. 구독 한도 초과 후 새 요청을 중단하고 사용자에게 ChatGPT 사용량 관리를 안내합니다. 구독 사용 허용 여부는 identity 로그인과 별도로 검사합니다.
+
+모바일 로컬 OAuth는 PKCE를 사용하더라도 OS가 앱 프로세스를 종료하면 재시도해야 합니다. Android 고유의 브라우저 전환과 foreground service 정책은 실기기 검증 대상이며, 실제 계정 동의·모델 응답은 연결 화면의 최소 기능 테스트로 확인합니다. [직접 인증 검증 절차](siwc-android.md)를 참고하세요.
 
 LLM 해설은 제한된 엔진 검색에 대한 해석입니다. `MoveJudgment`는 최선수와 평가 손실을 색상·기호로 표시합니다. 충분한 탐색 깊이, 합법적인 PV에서의 기물 희생, 보상 평가를 모두 만족할 때만 ‘탁월 후보’로 표시합니다. 확정 판정이나 Chess.com과 동일한 기준이라고 주장하지 않습니다. 전략적 근거가 PV로 증명되지 않으면 추정임을 표시하도록 요청합니다. 모델의 설명을 완전한 체스 증명으로 보장하지 않습니다.

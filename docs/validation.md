@@ -1,4 +1,15 @@
-# 검증 기록
+# 0.3.0 직접 ChatGPT 연결 검증 (2026-10-08)
+
+- 공식 OSS OAuth·모델·Responses·preview 문서와 production OIDC discovery를 읽어 동적 등록과 공개 API 직접 호출을 확인했습니다.
+- Gradle JVM OAuth/Responses 검사 16개 통과. RSA 서명·issuer/audience/nonce/시간·계정 혼합·PKCE·callback·동의 범위·스트림 완료·중간 한도 오류·503 구분·갱신 응답을 확인했습니다. 테스트 키와 모의 이벤트를 사용하며 실계정 성공을 의미하지 않습니다.
+- 체스 코어/실제 호스트 Stockfish 검사 54개 통과.
+- Android 11/API 30 x86_64 instrumentation 20개 통과. 실제 SQLite 기록 보존·Keystore 암호화/원자 저장·APK Stockfish·foreground loopback 준비와 위조 콜백 거부를 확인했습니다. 결과 `checks=20`, `result=PASS`, `INSTRUMENTATION_CODE=-1`. 서명 검증용 RSA 및 실제 OpenAI 계정은 JVM/수동 검증 범위를 따릅니다.
+- debug APK, Android test APK, release APK 빌드 및 Android lint 통과(오류 0). 릴리스 APK는 배포용 서명 검증 대상입니다.
+- 대응 소스 ZIP 생성과 NNUE·Java 의존성 소스 3개·원본 POM·고정 해시를 확인했습니다. APK/서명 키/이전 서버의 node_modules가 포함되지 않았습니다.
+- 실제 사용자 OAuth 로그인·구독 응답은 미검증입니다. 사용자 자신의 계정으로 [Android 최소 기능 절차](siwc-android.md)를 수행해야 합니다. Android 14/15 이상의 실기기 브라우저 전환도 확인 대상입니다.
+- 앱의 서버 연결 구조와 설치 단계는 제거했습니다. 아래 0.1/0.2의 서버 검사 및 read-only Codex 홈 기록은 과거 구조의 기록입니다.
+
+# 과거 검증 기록
 
 2026-10-07 클라우드 Linux x86_64에서 실행했습니다. 기기 검사는 Android 11/API 30 x86_64 소프트웨어 에뮬레이터를 사용했습니다. 물리 Android ARM64 기기와 iOS 검증은 수행하지 않았습니다.
 

@@ -26,7 +26,7 @@ public final class ReviewActivity extends Activity {
     private CoachClient client;
     private int index=0,ink,muted;
     private BoardView board;
-    private TextView position,feedback,status,movesText,advice;
+    private TextView position,feedback,status,movesText,advice,planUse;
     private ScrollView reviewScroll;
     private Button modelChip; private boolean recommendation=false; private LinearLayout candidates;
     private LinearLayout highlightList;
@@ -39,7 +39,7 @@ public final class ReviewActivity extends Activity {
         if(saved==null){finish();return;}try{game=Pgn.parse(saved.pgn());}catch(Exception e){finish();return;}
         ink=getColor(R.color.ink);muted=getColor(R.color.muted);index=state==null?0:state.getInt("index",0);
         LinearLayout outer=Ui.screen(this,false);Ui.header(this,outer,"대국 복기");
-        LinearLayout coach=Ui.card(this),top=new LinearLayout(this);top.addView(Ui.text(this,"AI 코치",15,true),new LinearLayout.LayoutParams(0,-2,1));modelChip=button(Ui.modelLabel(this)+" ▾",()->Ui.models(this,()->{renderFeedback();if(index>0)requestExplanation(index-1);}));top.addView(modelChip);coach.addView(top);advice=Ui.text(this,"",15,false);advice.setMaxLines(4);advice.setEllipsize(TextUtils.TruncateAt.END);advice.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("AI 코치 · "+Ui.modelLabel(this)).setMessage(advice.getText()).setPositiveButton("확인",null).setNeutralButton("연결 관리",(d,w)->startActivity(new Intent(this,ConnectionActivity.class))).show());coach.addView(advice);outer.addView(coach);Ui.gap(outer,12);
+        LinearLayout coach=Ui.card(this),top=new LinearLayout(this);top.addView(Ui.text(this,"AI 코치",15,true),new LinearLayout.LayoutParams(0,-2,1));modelChip=button(Ui.modelLabel(this)+" ▾",()->Ui.models(this,()->{renderFeedback();if(index>0)requestExplanation(index-1);}));top.addView(modelChip);coach.addView(top);planUse=Ui.text(this,"Using ChatGPT plan · Manage usage",11,false);planUse.setTextColor(muted);planUse.setOnClickListener(v->Ui.usage(this));coach.addView(planUse);advice=Ui.text(this,"",15,false);advice.setMaxLines(4);advice.setEllipsize(TextUtils.TruncateAt.END);advice.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("AI 코치 · "+Ui.modelLabel(this)).setMessage(advice.getText()).setPositiveButton("확인",null).setNeutralButton("연결 관리",(d,w)->startActivity(new Intent(this,ConnectionActivity.class))).show());coach.addView(advice);outer.addView(coach);Ui.gap(outer,12);
         ScrollView scroll=new ScrollView(this);reviewScroll=scroll;LinearLayout root=Ui.column(this);scroll.addView(root);outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));root.addView(text(saved.title(),21,ink));status=text("저장된 분석과 해설을 확인하세요.",12,muted);root.addView(status);
         board=new BoardView(this);board.onSquare=null;FrameLayout boardFrame=new FrameLayout(this);boardFrame.addView(board,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));root.addView(boardFrame,new LinearLayout.LayoutParams(-1,getResources().getDisplayMetrics().widthPixels-dp(40)));
         position=text("",15,ink);root.addView(position);
@@ -68,9 +68,9 @@ public final class ReviewActivity extends Activity {
     private String label(int ply){var p=game.plies().get(ply);return p.number()+(p.white()?". ":"... ")+p.san();}
     private JSONObject entry(int ply){var record=records.find(recordId);return record==null?null:record.analyses().optJSONObject(Integer.toString(ply));}
     private JSONObject cached(JSONObject e,String model){if(e==null)return null;JSONObject map=e.optJSONObject("aiByModel"),found=map==null?null:map.optJSONObject(model);if(found!=null)return found;JSONObject r=e.optJSONObject("aiResponse");if(r!=null&&model.equals(r.optString("model")))try{return new JSONObject().put("text",e.optString("aiText"));}catch(Exception ignored){}return null;}
-    private void renderFeedback(){
+    private void renderFeedback(){planUse.setText(ChatGptAccounts.connected(this)?"Using ChatGPT plan · Manage usage":"ChatGPT 연결 · Manage usage");
         modelChip.setText(Ui.modelLabel(this)+" ▾");candidates.removeAllViews();String model=Ui.model(this);JSONObject e=index==0?null:entry(index-1),ai=cached(e,model);
-        String aiText=ai==null?"":ai.optString("text");if(aiText.startsWith("CODEX /")){int line=aiText.indexOf('\n');if(line>=0)aiText=aiText.substring(line+1);}
+        String aiText=ai==null?"":ai.optString("text");if((aiText.startsWith("CODEX /")||aiText.startsWith("CHATGPT /"))){int line=aiText.indexOf('\n');if(line>=0)aiText=aiText.substring(line+1);}
         advice.setText(ai!=null?aiText:index>0&&model.equals(pending.get(index-1))?"이 수의 흐름과 다음 계획을 정리하고 있어요…":"AI 코치를 연결하면 이 수의 조언을 볼 수 있어요. 연결 후 ‘이 수 해설’을 눌러주세요.");
         if(index==0){feedback.setText("수순을 누르거나 다음 버튼으로 이동하세요.");return;}
         if(e==null){feedback.setText("아직 분석하지 않은 수예요. ‘이 수 해설’ 또는 전체 분석을 선택하세요.");return;}
@@ -113,11 +113,11 @@ public final class ReviewActivity extends Activity {
     private void explainSelected(){if(game.plies().isEmpty())return;int ply=index==0?0:index-1;status.setText("이 수 분석·해설 준비 중…");engineJobs.submit(()->{try{analyzePly(ply);runOnUiThread(()->{if(!destroyed){show(ply+1);requestExplanation(ply);status.setText("분석 저장됨 · 해설은 상단에 표시됩니다.");}});}catch(Exception e){runOnUiThread(()->status.setText("분석 실패 · "+e.getMessage()));}});}
     private void requestExplanation(int ply){
         JSONObject saved=entry(ply);String model=Ui.model(this);if(saved==null||model.equals(pending.get(ply))||cached(saved,model)!=null)return;
-        if(getSharedPreferences("coach",0).getString("endpoint","").trim().isEmpty())return;
+        if(!ChatGptAccounts.connected(this))return;
         JSONObject payload;try{payload=new JSONObject(saved.getJSONObject("payload").toString());payload.put("model",model);JSONArray hs=records.find(recordId).highlights();for(int i=0;i<hs.length();i++){JSONObject f=hs.getJSONObject(i);if(f.getInt("ply")==ply)payload.put("learningFocus",f.getString("focus"));}}catch(Exception e){return;}
         pending.put(ply,model);renderFeedback();
         coachJobs.submit(()->{if(destroyed)return;try{JSONObject result=client.request("/v1/explain",payload);records.explanation(recordId,ply,result,AnalysisJson.explanation(result));}
-            catch(Exception e){runOnUiThread(()->{if(!destroyed)status.setText("해설 연결 실패 · 연결 관리에서 확인하고 다시 요청해주세요.");});}
+            catch(Exception e){runOnUiThread(()->{if(!destroyed)status.setText(e.getMessage()==null?"해설 연결을 확인해 주세요.":e.getMessage());});}
             finally{runOnUiThread(()->{if(model.equals(pending.get(ply)))pending.remove(ply);if(!destroyed)renderFeedback();});}});
     }
     private void renderHighlights(){
@@ -125,6 +125,7 @@ public final class ReviewActivity extends Activity {
         if(saved.highlights().length()==0){highlightList.addView(text("아직 선정된 하이라이트가 없습니다. 직접 둔 대국도 생성 버튼으로 같은 분석을 받을 수 있습니다. 분석 결과에 적합한 국면이 없으면 목록은 비어 있을 수 있습니다.",13,muted));return;}
         for(int i=0;i<saved.highlights().length();i++){JSONObject f=saved.highlights().optJSONObject(i);if(f==null)continue;int ply=f.optInt("ply");LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.addView(button(label(ply)+" · "+f.optString("title"),()->{show(ply);new AlertDialog.Builder(this).setTitle(f.optString("title")).setMessage(f.optString("reason")+"\n\n표시된 국면은 해당 수를 두기 직전입니다.").setPositiveButton("실전 수와 해설 보기",(d,w)->{show(ply+1);requestExplanation(ply);}).setNegativeButton("직전 국면 보기",null).show();}));card.addView(text(f.optString("reason"),13,muted));highlightList.addView(card);}
     }
+    @Override protected void onStart(){super.onStart();if(modelChip!=null){renderFeedback();if(index>0)requestExplanation(index-1);}}
     @Override protected void onSaveInstanceState(Bundle out){out.putInt("index",index);super.onSaveInstanceState(out);}
     @Override protected void onDestroy(){destroyed=true;cancel=true;engineJobs.shutdownNow();coachJobs.shutdownNow();EngineWork.close(()->{if(engine!=null)engine.close();});super.onDestroy();}
 }

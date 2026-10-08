@@ -6,9 +6,10 @@ vendor/stockfish/src/*.nnue
 vendor/stockfish/src/*.o
 vendor/stockfish/src/.depend
 vendor/stockfish/src/stockfish*
-companion/node_modules/
-companion/.env
-companion/.cache/
 *.apk
 *.keystore
 artifacts/
+vendor/java/*.jar
+vendor/java/*-pom.xml
+# Leftover dependencies from the removed companion; never include them in source artifacts.
+companion/
