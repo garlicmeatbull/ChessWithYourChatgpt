@@ -14,7 +14,7 @@ public final class BoardView extends View {
     public BoardView(Context c){super(c);setContentDescription("체스판. 백은 아래쪽. 기물과 목적지 칸을 차례로 누르세요.");setFocusable(true);}
     public void animateMove(Chess before,Chess.Move move,Chess after){
         if(motion!=null)motion.cancel();movingMove=null;
-        if(!getContext().getSharedPreferences("appearance",0).getBoolean("animation",false))return;
+        if(!getContext().getSharedPreferences("appearance",0).getBoolean("animation",true))return;
         movingBefore=before.copy();movingMove=move;movingAfter=after.fen();fraction=0;
         android.animation.ValueAnimator next=android.animation.ValueAnimator.ofFloat(0,1);motion=next;next.setDuration(180);next.setInterpolator(new android.view.animation.DecelerateInterpolator());next.addUpdateListener(v->{fraction=(float)v.getAnimatedValue();invalidate();});next.addListener(new android.animation.AnimatorListenerAdapter(){@Override public void onAnimationEnd(android.animation.Animator a){if(motion==a){movingMove=null;motion=null;invalidate();}}});next.start();
     }

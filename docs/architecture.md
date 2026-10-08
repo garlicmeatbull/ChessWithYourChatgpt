@@ -39,12 +39,21 @@ LLM 해설은 제한된 엔진 검색에 대한 해석입니다. `MoveJudgment`�
 
 ## 0.5.0 local sessions and layout
 
-`ThemedActivity` wraps each Activity context with the saved night-mode preference. `Appearance` stores system/light/dark and an independent animation flag (default false). Changing theme recreates the Activity; play state is restored from SQLite and review retains its selected ply.
+`ThemedActivity` wraps each Activity context with the saved night-mode preference. `Appearance` stores system/light/dark and an independent animation flag (default true, preserving explicit OFF preferences). Changing theme recreates the Activity; play state is restored from SQLite and review retains its selected ply.
 
-The coach occupies a fixed 210dp scrollable slot. The playing/review board sits in its own remaining-height frame. Review analysis, notation, highlights and continuation actions live in the separate tools dialog; result banners reuse a fixed footer slot. Advice visibility and streaming do not affect board geometry.
+The coach occupies a fixed 176dp scrollable slot. The playing/review board sits in its own remaining-height frame. Review analysis, notation, highlights and continuation actions live in the separate tools dialog; result banners reuse a fixed footer slot. Advice visibility and streaming do not affect board geometry.
 
 `coach.activeRecord` is a synchronously committed pointer to a SQLite game. Every move is committed to the record before updating the pointer; unfinished zero-move games are records too. The PGN, including initial FEN and `CoachPlayer`, is authoritative during restoration. A prior Activity cannot overwrite a newer active session or recreate a deleted record. Resignation invalidates pending engine callbacks, persists the result and prevents further moves. Opponent work is admitted only once per pending turn; callbacks verify the original FEN and move legality before applying a reply after a pause/resume.
 
 `Records.branch` transactionally creates a prefix game and copies only prefix analyses/highlights. `CoachBranchStart` persists the undo boundary and `CoachPlayer` preserves the assigned side through PGN export/replay. Original records remain independent. Record lists and PGN parsing load off the UI thread with generation guards against stale loads.
 
 `ModelPolicy` selects only among the authenticated account's catalog and preserves the explicit preferred slug. Model guidance is a task-fit heuristic, with no claimed latency benchmark or subscription-usage conversion. Animation uses a local 180ms ValueAnimator, including castling rook movement; pawn promotion renders the pawn in motion and the promoted piece at completion. No AI requests are made for animation or arrow extraction.
+
+
+## 0.5.1 coaching presentation and latency
+
+`CoachPanel.bind` receives genuine-output state separately from loading placeholders. The triangular white loader is visible only before the first output, and there is no competing status label. Body/background clicks open the read view; streaming/empty explanations do not dispatch additional inference. Model selection and automation remain independent controls. Full/visual explanations use more spacing, and the visual preview collapses its already-cached text without generating another response.
+
+`CoachEvidence` locally replaces legal UCI moves and PVs with SAN when the complete serialized evidence becomes shorter. It preserves positions, evaluations, mate values and depth, leaves stored engine data untouched, and falls back to the original payload on invalid notation or larger output. Serialized character count is not a tokenizer measurement.
+
+Play starts the single coaching request after the candidate and played-move search, concurrently with the after-position display search. Early trend uses the played root score, while the later search refines the displayed/stored trend. Both searches and every original candidate/PV remain available; the follow-up evaluation callback does not submit a second coaching request. Reasoning effort and candidate count are unchanged. No claim of measured provider latency or identical generated prose is made.
