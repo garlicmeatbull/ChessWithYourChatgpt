@@ -2,6 +2,10 @@
 
 체스를 두면서 Stockfish의 추천 수와 그 근거를 복기하는 **네이티브 Android 앱**입니다. Java Activity/View/Canvas를 사용하며 Android 8.1(API 27) 이상 ARM64 기기를 우선 지원합니다. iOS 구현은 포함하지 않습니다. 현재 0.5.1은 작은 코칭 카드, 여유 있는 버튼·설명 화면, 첫 글자에서 사라지는 삼각형 로딩과 응답 경로 최적화를 제공합니다.
 
+**Android 설치:** [APK 바로 다운로드 · 0.5.1](https://github.com/garlicmeatbull/ChessWithYourChatgpt/releases/download/v0.5.1/ChessCoach-0.5.1.apk) · [최신 릴리스와 대응 소스](https://github.com/garlicmeatbull/ChessWithYourChatgpt/releases/latest)
+
+APK를 휴대폰에서 열고 요청 시 해당 브라우저/파일 앱의 ‘알 수 없는 앱 설치’를 허용하세요. GitHub 로그인이나 ZIP 압축 해제가 필요하지 않습니다. 개발용 서명 APK이며 기존 설치와 서명 키가 다르면 업데이트가 거부될 수 있습니다. 앱 삭제 시 저장 기록도 삭제되므로 아래 서명 안내를 먼저 확인하세요.
+
 0.5.1 사용 방법:
 
 - 홈의 **화면 설정**에서 시스템/화이트/다크 테마를 선택합니다. 기물 이동 애니메이션은 기본 ON이며 이곳에서 끌 수 있습니다. 기존에 직접 끈 설정은 유지합니다. 대국 메뉴에서도 같은 설정을 엽니다.
@@ -56,6 +60,8 @@ bash scripts/build-stockfish.sh
 `build-stockfish.sh`는 SHA-256이 고정된 공식 Stockfish 릴리스에서 NNUE를 복원하고 ARM64 NEON 및 x86_64 SSE2 실행 파일을 소스로 빌드합니다. 전체 NNUE가 실행 파일에 포함되었는지도 검사합니다. 두 ABI 모두 API 26 및 16KB ELF 페이지 정렬로 빌드합니다. 큰 NNUE가 포함되므로 APK 크기와 최초 빌드 시간이 큽니다.
 
 GitHub에 push하면 `Native Android` Actions가 APK와 대응 소스를 같은 다운로드 artifact로 만들도록 설정했습니다. 성공한 실행의 `ChessCoach-Android-and-source` artifact에서 APK와 대응 소스를 함께 받을 수 있습니다. 빌드 상태는 저장소의 Actions에서 확인하세요.
+
+`v0.5.1`처럼 `app/build.gradle`의 버전과 일치하는 태그를 push하면 같은 검사를 통과한 뒤 GitHub Releases에도 APK, 대응 소스 ZIP, SHA-256 목록을 게시합니다. `docs/releases/<버전>.md`의 설치 안내와 변경 사항을 사용합니다. 파일을 모두 올린 뒤 초안을 공개하며, 릴리스 게시 작업만 저장소 쓰기 권한을 갖습니다. 일반 main/PR 빌드는 릴리스를 게시하지 않습니다.
 
 Actions 다운로드에는 `ChessCoach-0.5.1.apk`와 대응 소스 ZIP을 평평한 구조로 제공합니다. 개발 APK의 키는 각 CI 실행에서 생성하므로 이전 APK와 서명 불일치 시 앱 삭제 후 재설치가 필요합니다. 삭제 전 필요한 대국의 PGN을 복사하세요. PGN에는 AI 해설과 분석 캐시가 포함되지 않습니다. 동일한 개발 키로 업데이트하려면 Android 기본 개발 키 형식의 keystore를 base64로 인코딩해 저장소의 `CHESS_DEBUG_KEYSTORE_BASE64` Actions secret에 설정할 수 있습니다. 서명 키는 저장소·artifact·공개 캐시에 포함하지 않습니다. 정식 배포에는 보관하는 릴리스 키를 사용하세요.
 
