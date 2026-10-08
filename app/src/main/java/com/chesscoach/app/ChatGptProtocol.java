@@ -48,10 +48,14 @@ public final class ChatGptProtocol {
     public static boolean sharing(JSONObject profile){List<String> scopes=Arrays.asList(profile.optString("scope","").split("\\s+"));return !profile.optString("access_token","").isEmpty()&&scopes.contains("chatgpt.tokens.use.direct")&&scopes.contains("resource.invoke");}
     public static JSONObject responseRequest(String model,String input,String instructions)throws Exception {return new JSONObject().put("model",model).put("input",new JSONArray().put(new JSONObject().put("role","user").put("content",input))).put("instructions",instructions).put("store",false).put("stream",true);}
     public static JSONObject completed(Reader source)throws Exception {
+        return completed(source,null);
+    }
+    public interface TextProgress {void update(String text)throws Exception;}
+    public static JSONObject completed(Reader source,TextProgress progress)throws Exception {
         BufferedReader reader=new BufferedReader(source);StringBuilder data=new StringBuilder(),text=new StringBuilder();long bytes=0;String line;
         while((line=reader.readLine())!=null){bytes+=line.length();if(bytes>4194304)throw new IOException("AI 응답이 너무 큽니다.");if(line.startsWith("data:")){if(data.length()>0)data.append('\n');data.append(line.substring(5).trim());}else if(line.isEmpty()&&data.length()>0){
                 String event=data.toString();data.setLength(0);if(event.equals("[DONE]"))break;JSONObject e=new JSONObject(event);String type=e.optString("type");
-                if(type.equals("response.output_text.delta")){text.append(e.optString("delta"));if(text.length()>65536)throw new IOException("AI 해설이 너무 깁니다.");}
+                if(type.equals("response.output_text.delta")){text.append(e.optString("delta"));if(text.length()>65536)throw new IOException("AI 해설이 너무 깁니다.");if(progress!=null)progress.update(text.toString());}
                 if(type.equals("response.failed"))throw ApiError.from(200,e.optJSONObject("response"),"");
                 if(type.equals("error"))throw ApiError.from(200,e,"");
                 if(type.equals("response.incomplete"))throw new IOException("AI 응답이 미완료입니다. 저장하지 않았습니다.");

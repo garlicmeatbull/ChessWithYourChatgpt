@@ -1,3 +1,11 @@
+# 0.4.0 요약·상세 스트리밍 검증 (2026-10-08)
+
+- `testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug`: 성공. JVM 27개(기존 프로토콜 17개 + 새 코칭 10개), 실패/오류/스킵 0. Lint 오류 0, 경고 20.
+- 새 코칭 검사: SSE delta 전달과 최종 텍스트 우선, 미완료/취소 응답 미저장, 부분 JSON의 모든 문자열 경계·유니코드/이스케이프, 요약·상세 및 두 usage의 병합, 이전 캐시 호환, 선택한 수의 대기 요청 우선순위.
+- Android API 30 x86_64에서 `am instrument -w -e coachOnly true com.chesscoach.app.test/com.chesscoach.app.NativeSmoke`: **6개 PASS**, `INSTRUMENTATION_CODE: -1`. 실제 네이티브 마크다운 span 및 SQLite에 요약·상세와 두 요청의 usage 저장/재열기를 확인했습니다. 코칭 외 기존 instrumentation 검사는 이번에는 재실행하지 않았습니다.
+- 대응 소스 ZIP 생성 및 Java 의존성 소스 체크섬 확인 성공. 새 외부 마크다운 의존성은 추가하지 않았습니다.
+- 실제 서비스의 첫 토큰/완료 응답 시간과 품질 개선 비율은 측정하지 않았습니다. 실기기의 스트리밍·팝업 외관·큰 글꼴·모델 변경/오류 동작은 `docs/siwc-android.md` 절차로 추가 확인해야 합니다. 아래 이전 버전 결과는 과거 검증입니다.
+
 # 0.3.0 직접 ChatGPT 연결 검증 (2026-10-08)
 
 - 공식 OSS OAuth·모델·Responses·preview 문서와 production OIDC discovery를 읽어 동적 등록과 공개 API 직접 호출을 확인했습니다.

@@ -7,13 +7,16 @@ import java.util.*;
 /** Instrumentation against real Android SQLite, keystore and packaged native engine. */
 public final class NativeSmoke extends Instrumentation {
     private int checks=0;
+    private boolean coachOnly;
     private void check(boolean condition,String message){if(!condition)throw new AssertionError(message);checks++;}
-    @Override public void onCreate(Bundle args){super.onCreate(args);start();}
+    @Override public void onCreate(Bundle args){super.onCreate(args);coachOnly=args!=null&&"true".equals(args.getString("coachOnly"));start();}
     @Override public void onStart(){Bundle result=new Bundle();
         android.content.Context testContext=new android.content.ContextWrapper(getTargetContext()){
             @Override public android.content.SharedPreferences getSharedPreferences(String name,int mode){return super.getSharedPreferences("instrumentation-"+name,mode);}
         };
         try{
+            coachChecks();
+            if(coachOnly){result.putString("result","PASS");result.putInt("checks",checks);finish(-1,result);return;}
             Pgn.Game game=Pgn.parse("1. e4 e5 2. Nf3 Nc6 *");
             try(Records db=new Records(getTargetContext(),"instrumentation-records.db")){
                 long played=db.create("Played test","played",game),imported=db.create("Imported test","imported",game);
@@ -62,5 +65,27 @@ public final class NativeSmoke extends Instrumentation {
             result.putString("result","PASS");result.putInt("checks",checks);finish(-1,result);
         }catch(Throwable e){result.putString("result","FAIL");result.putString("error",e.toString());finish(1,result);}
         finally{getTargetContext().stopService(new android.content.Intent(getTargetContext(),ChatGptLoginService.class));testContext.deleteFile("instrumentation-chatgpt.enc");getTargetContext().deleteDatabase("instrumentation-records.db");testContext.getSharedPreferences("coach",0).edit().clear().commit();}
+    }
+    private void coachChecks()throws Exception {
+        CharSequence rendered=CoachMarkdown.render("## 이번 수\n**중앙**을 지키고 *전개*하세요.\n- `Nf3`를 확인하세요.");
+        check(rendered.toString().equals("이번 수\n중앙을 지키고 전개하세요.\n• Nf3를 확인하세요."),"Markdown shown without syntax, with native bullet list");
+        android.text.Spanned spans=(android.text.Spanned)rendered;
+        check(spans.getSpans(0,rendered.length(),android.text.style.StyleSpan.class).length==3,"native heading, bold and italic spans");
+        check(spans.getSpans(0,rendered.length(),android.text.style.TypefaceSpan.class).length==1,"chess notation uses native monospace span");
+        long id;
+        try(Records db=new Records(getTargetContext(),"instrumentation-coach-stream.db")){
+            id=db.create("stream cache","imported",Pgn.parse("1. e4 e5 *"));
+            JSONObject summary=new JSONObject().put("model","stream-model").put("explanation",new JSONObject().put("summary","**중앙**을 차지하세요.")).put("usage",new JSONObject().put("output_tokens",20));
+            db.explanation(id,0,summary,AnalysisJson.explanation(summary));
+            JSONObject cache=db.find(id).analyses().getJSONObject("0").getJSONObject("aiByModel").getJSONObject("stream-model");
+            check(!CoachText.detailed(cache)&&CoachText.summary(cache).equals("**중앙**을 차지하세요."),"summary persisted without claiming detailed answer");
+            JSONObject detail=new JSONObject().put("model","stream-model").put("explanation",new JSONObject().put("flow","판단").put("bestMoveReason","근거").put("plan","계획")).put("usage",new JSONObject().put("output_tokens",90));
+            db.explanation(id,0,detail,AnalysisJson.explanation(detail));
+        }
+        try(Records db=new Records(getTargetContext(),"instrumentation-coach-stream.db")){
+            JSONObject cache=db.find(id).analyses().getJSONObject("0").getJSONObject("aiByModel").getJSONObject("stream-model");
+            check(CoachText.detailed(cache)&&CoachText.summary(cache).equals("**중앙**을 차지하세요."),"summary and details survive real SQLite reopen");
+            check(cache.getJSONObject("response").getJSONObject("summaryUsage").getInt("output_tokens")==20&&cache.getJSONObject("response").getJSONObject("detailUsage").getInt("output_tokens")==90,"both requests retain usage in stored record");
+        }finally{getTargetContext().deleteDatabase("instrumentation-coach-stream.db");}
     }
 }

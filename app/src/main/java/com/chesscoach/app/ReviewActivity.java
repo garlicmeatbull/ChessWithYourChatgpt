@@ -15,11 +15,13 @@ import java.util.concurrent.*;
 
 /** Same viewer and persistent analysis for games played in-app and imported PGN. */
 public final class ReviewActivity extends Activity {
-    private final ExecutorService engineJobs=EngineWork.queue(),coachJobs=Executors.newSingleThreadExecutor();
+    private final ExecutorService engineJobs=EngineWork.queue();private final CoachQueue coachJobs=new CoachQueue();
     private volatile boolean destroyed=false,cancel=false;
     private volatile Stockfish engine;
     private volatile boolean analyzing=false;
-    private final Map<Integer,String> pending=new HashMap<>();
+    private static final class Pending {final String model;final boolean detail,foreground;volatile boolean running;String text="";Pending(String m,boolean d,boolean f){model=m;detail=d;foreground=f;}}
+    private final Map<Integer,Pending> pending=new ConcurrentHashMap<>();
+    private CoachPanel coachPanel;
     private long recordId;
     private Pgn.Game game;
     private Records records;
@@ -39,7 +41,7 @@ public final class ReviewActivity extends Activity {
         if(saved==null){finish();return;}try{game=Pgn.parse(saved.pgn());}catch(Exception e){finish();return;}
         ink=getColor(R.color.ink);muted=getColor(R.color.muted);index=state==null?0:state.getInt("index",0);
         LinearLayout outer=Ui.screen(this,false);Ui.header(this,outer,"대국 복기");
-        LinearLayout coach=Ui.card(this),top=new LinearLayout(this);top.addView(Ui.text(this,"AI 코치",15,true),new LinearLayout.LayoutParams(0,-2,1));modelChip=button(Ui.modelLabel(this)+" ▾",()->Ui.models(this,()->{renderFeedback();if(index>0)requestExplanation(index-1);}));top.addView(modelChip);coach.addView(top);planUse=Ui.text(this,"Using ChatGPT plan · Manage usage",11,false);planUse.setTextColor(muted);planUse.setOnClickListener(v->Ui.usage(this));coach.addView(planUse);advice=Ui.text(this,"",15,false);advice.setMaxLines(4);advice.setEllipsize(TextUtils.TruncateAt.END);advice.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("AI 코치 · "+Ui.modelLabel(this)).setMessage(advice.getText()).setPositiveButton("확인",null).setNeutralButton("연결 관리",(d,w)->startActivity(new Intent(this,ConnectionActivity.class))).show());coach.addView(advice);outer.addView(coach);Ui.gap(outer,12);
+        LinearLayout coach=Ui.card(this),top=new LinearLayout(this);top.addView(Ui.text(this,"AI 코치",15,true),new LinearLayout.LayoutParams(0,-2,1));modelChip=button(Ui.modelLabel(this)+" ▾",()->Ui.models(this,()->{renderFeedback();if(index>0)requestExplanation(index-1);}));top.addView(modelChip);coach.addView(top);planUse=Ui.text(this,"Using ChatGPT plan · Manage usage",11,false);planUse.setTextColor(muted);planUse.setOnClickListener(v->Ui.usage(this));coach.addView(planUse);coachPanel=new CoachPanel(this,coach);advice=coachPanel.textView();outer.addView(coach);Ui.gap(outer,12);
         ScrollView scroll=new ScrollView(this);reviewScroll=scroll;LinearLayout root=Ui.column(this);scroll.addView(root);outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));root.addView(text(saved.title(),21,ink));status=text("저장된 분석과 해설을 확인하세요.",12,muted);root.addView(status);
         board=new BoardView(this);board.onSquare=null;FrameLayout boardFrame=new FrameLayout(this);boardFrame.addView(board,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));root.addView(boardFrame,new LinearLayout.LayoutParams(-1,getResources().getDisplayMetrics().widthPixels-dp(40)));
         position=text("",15,ink);root.addView(position);
@@ -63,15 +65,14 @@ public final class ReviewActivity extends Activity {
         for(int i=0;i<game.plies().size();i++){
             var p=game.plies().get(i);if(p.white()||i==0)notation.append(p.number()+(p.white()?". ":"... "));int start=notation.length();notation.append(p.san());int selected=i;
             notation.setSpan(new ClickableSpan(){@Override public void onClick(View v){show(selected+1);}@Override public void updateDrawState(TextPaint ds){ds.setColor(selected+1==index?getColor(android.R.color.holo_green_dark):muted);ds.setUnderlineText(selected+1==index);}},start,notation.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);notation.append("   ");
-        }movesText.setText(notation);renderFeedback();
+        }movesText.setText(notation);renderFeedback();if(index>0)requestExplanation(index-1);
     }
     private String label(int ply){var p=game.plies().get(ply);return p.number()+(p.white()?". ":"... ")+p.san();}
     private JSONObject entry(int ply){var record=records.find(recordId);return record==null?null:record.analyses().optJSONObject(Integer.toString(ply));}
-    private JSONObject cached(JSONObject e,String model){if(e==null)return null;JSONObject map=e.optJSONObject("aiByModel"),found=map==null?null:map.optJSONObject(model);if(found!=null)return found;JSONObject r=e.optJSONObject("aiResponse");if(r!=null&&model.equals(r.optString("model")))try{return new JSONObject().put("text",e.optString("aiText"));}catch(Exception ignored){}return null;}
+    private JSONObject cached(JSONObject e,String model){if(e==null)return null;JSONObject map=e.optJSONObject("aiByModel"),found=map==null?null:map.optJSONObject(model);if(found!=null)return found;JSONObject r=e.optJSONObject("aiResponse");if(r!=null&&model.equals(r.optString("model")))try{return new JSONObject().put("response",r).put("text",e.optString("aiText"));}catch(Exception ignored){}return null;}
     private void renderFeedback(){planUse.setText(ChatGptAccounts.connected(this)?"Using ChatGPT plan · Manage usage":"ChatGPT 연결 · Manage usage");
         modelChip.setText(Ui.modelLabel(this)+" ▾");candidates.removeAllViews();String model=Ui.model(this);JSONObject e=index==0?null:entry(index-1),ai=cached(e,model);
-        String aiText=ai==null?"":ai.optString("text");if((aiText.startsWith("CODEX /")||aiText.startsWith("CHATGPT /"))){int line=aiText.indexOf('\n');if(line>=0)aiText=aiText.substring(line+1);}
-        advice.setText(ai!=null?aiText:index>0&&model.equals(pending.get(index-1))?"이 수의 흐름과 다음 계획을 정리하고 있어요…":"AI 코치를 연결하면 이 수의 조언을 볼 수 있어요. 연결 후 ‘이 수 해설’을 눌러주세요.");
+        renderCoach(e,ai,model);
         if(index==0){feedback.setText("수순을 누르거나 다음 버튼으로 이동하세요.");return;}
         if(e==null){feedback.setText("아직 분석하지 않은 수예요. ‘이 수 해설’ 또는 전체 분석을 선택하세요.");return;}
         feedback.setText(e.optString("local","저장된 분석"));
@@ -80,6 +81,14 @@ public final class ReviewActivity extends Activity {
             for(var line:a.lines()){if(line.pv().isEmpty())continue;String uci=line.pv().get(0),san=new Chess(p.before()).san(Chess.Move.parse(uci));Button candidate=button("↗ "+san+"   "+line.score(),()->{board.board=new Chess(p.before());board.setLastMove(index>1?Chess.Move.parse(game.plies().get(index-2).uci()):null);board.recommendation=uci;board.playedArrow=p.uci();board.judgedSquare=-1;board.invalidate();reviewScroll.smoothScrollTo(0,0);position.setText("착수 전 · 후보 "+san);});candidates.addView(candidate);}
             board.invalidate();
         }catch(Exception ignored){}
+    }
+    private void renderCoach(JSONObject e,JSONObject ai,String model){
+        Pending job=index>0?pending.get(index-1):null;boolean streaming=job!=null&&model.equals(job.model);
+        String summary=ai!=null?CoachText.summary(ai):streaming&&!job.detail&&!job.text.isEmpty()?job.text:streaming?"이번 수의 핵심 조언을 준비하고 있어요…":"AI 코치를 연결하면 이 수의 조언을 볼 수 있어요. 연결 후 ‘이 수 해설’을 눌러주세요.";
+        String full=streaming&&job.detail&&!job.text.isEmpty()?job.text:ai!=null?CoachText.markdown(ai):summary;
+        if(e!=null&&!e.optString("local").isEmpty())full+="\n\n## Stockfish 평가\n"+e.optString("local");
+        if(e!=null&&!streaming&&!CoachText.detailed(ai)&&model.equals(e.optString("detailErrorModel")))full+="\n\n"+e.optString("detailError");
+        coachPanel.bind(model+":"+index,summary,full,streaming,ai!=null,()->{if(index>0)requestExplanation(index-1,true,true);});
     }
     private JSONObject analyzePly(int ply)throws Exception {
         JSONObject saved=entry(ply);if(saved!=null&&saved.has("details")&&saved.has("payload"))return saved;
@@ -102,7 +111,7 @@ public final class ReviewActivity extends Activity {
                     runOnUiThread(()->{if(!destroyed)status.setText("Stockfish 분석 "+(ply+1)+" / "+game.plies().size()+" · 완료된 수는 저장됨");});
                     JSONObject saved=analyzePly(i);JSONObject details=saved.getJSONObject("details");var analysis=AnalysisJson.analysis(details.getJSONObject("analysis"));Stockfish.Line actual=details.isNull("playedScore")?null:AnalysisJson.line(details.getJSONObject("playedScore"));
                     var finding=Highlights.find(i,new Chess(game.plies().get(i).before()),game.plies().get(i).uci(),analysis,actual);if(finding!=null)findings.add(finding);
-                    runOnUiThread(()->{if(!destroyed){renderFeedback();requestExplanation(ply);}});
+                    runOnUiThread(()->{if(!destroyed){renderFeedback();requestExplanation(ply,false,false);}});
                 }
                 if(!cancel&&!destroyed)records.highlights(recordId,Highlights.select(findings));
                 runOnUiThread(()->{if(!destroyed){status.setText(cancel?"분석 중단 · 저장된 수부터 재개할 수 있습니다.":"Stockfish 분석 완료 · 학습 하이라이트 저장됨");renderHighlights();}});
@@ -111,14 +120,22 @@ public final class ReviewActivity extends Activity {
         });
     }
     private void explainSelected(){if(game.plies().isEmpty())return;int ply=index==0?0:index-1;status.setText("이 수 분석·해설 준비 중…");engineJobs.submit(()->{try{analyzePly(ply);runOnUiThread(()->{if(!destroyed){show(ply+1);requestExplanation(ply);status.setText("분석 저장됨 · 해설은 상단에 표시됩니다.");}});}catch(Exception e){runOnUiThread(()->status.setText("분석 실패 · "+e.getMessage()));}});}
-    private void requestExplanation(int ply){
-        JSONObject saved=entry(ply);String model=Ui.model(this);if(saved==null||model.equals(pending.get(ply))||cached(saved,model)!=null)return;
+    private void requestExplanation(int ply){requestExplanation(ply,false,true);}
+    private void requestExplanation(int ply,boolean detail,boolean foreground){
+        JSONObject saved=entry(ply);String model=Ui.model(this);JSONObject ai=cached(saved,model);Pending old=pending.get(ply);
+        if(saved==null||ai!=null&&(!detail||CoachText.detailed(ai)))return;
+        if(old!=null&&model.equals(old.model)&&(!foreground||old.foreground||old.running))return;
         if(!ChatGptAccounts.connected(this))return;
-        JSONObject payload;try{payload=new JSONObject(saved.getJSONObject("payload").toString());payload.put("model",model);JSONArray hs=records.find(recordId).highlights();for(int i=0;i<hs.length();i++){JSONObject f=hs.getJSONObject(i);if(f.getInt("ply")==ply)payload.put("learningFocus",f.getString("focus"));}}catch(Exception e){return;}
-        pending.put(ply,model);renderFeedback();
-        coachJobs.submit(()->{if(destroyed)return;try{JSONObject result=client.request("/v1/explain",payload);records.explanation(recordId,ply,result,AnalysisJson.explanation(result));}
-            catch(Exception e){runOnUiThread(()->{if(!destroyed)status.setText(e.getMessage()==null?"해설 연결을 확인해 주세요.":e.getMessage());});}
-            finally{runOnUiThread(()->{if(model.equals(pending.get(ply)))pending.remove(ply);if(!destroyed)renderFeedback();});}});
+        JSONObject payload;try{payload=new JSONObject(saved.getJSONObject("payload").toString());payload.put("model",model).put("detail",detail);JSONArray hs=records.find(recordId).highlights();for(int i=0;i<hs.length();i++){JSONObject f=hs.getJSONObject(i);if(f.getInt("ply")==ply)payload.put("learningFocus",f.getString("focus"));}}catch(Exception e){return;}
+        Pending job=new Pending(model,detail,foreground);pending.put(ply,job);renderFeedback();
+        coachJobs.submit(()->{if(destroyed||pending.get(ply)!=job)return;job.running=true;try{
+            JSONObject result=client.request("/v1/explain",payload,partial->{
+                if(destroyed||pending.get(ply)!=job)throw new java.io.InterruptedIOException("해설 요청이 바뀌었습니다.");
+                runOnUiThread(()->{if(!destroyed&&pending.get(ply)==job){job.text=partial;if(index==ply+1&&model.equals(Ui.model(this))){JSONObject e=entry(ply);renderCoach(e,cached(e,model),model);}}});
+            });
+            if(!destroyed&&pending.get(ply)==job)records.explanation(recordId,ply,result,AnalysisJson.explanation(result));
+        }catch(Exception e){String message=e.getMessage()==null?"해설 연결을 확인해 주세요.":e.getMessage();runOnUiThread(()->{if(!destroyed&&pending.get(ply)==job){status.setText(message);if(detail)try{records.patch(recordId,ply,new JSONObject().put("detailErrorModel",model).put("detailError",message));}catch(Exception ignored){}}});}
+        finally{runOnUiThread(()->{pending.remove(ply,job);if(!destroyed)renderFeedback();});}},foreground);
     }
     private void renderHighlights(){
         highlightList.removeAllViews();var saved=records.find(recordId);if(saved==null)return;
@@ -127,5 +144,5 @@ public final class ReviewActivity extends Activity {
     }
     @Override protected void onStart(){super.onStart();if(modelChip!=null){renderFeedback();if(index>0)requestExplanation(index-1);}}
     @Override protected void onSaveInstanceState(Bundle out){out.putInt("index",index);super.onSaveInstanceState(out);}
-    @Override protected void onDestroy(){destroyed=true;cancel=true;engineJobs.shutdownNow();coachJobs.shutdownNow();EngineWork.close(()->{if(engine!=null)engine.close();});super.onDestroy();}
+    @Override protected void onDestroy(){destroyed=true;cancel=true;if(coachPanel!=null)coachPanel.close();engineJobs.shutdownNow();coachJobs.shutdownNow();EngineWork.close(()->{if(engine!=null)engine.close();});super.onDestroy();}
 }

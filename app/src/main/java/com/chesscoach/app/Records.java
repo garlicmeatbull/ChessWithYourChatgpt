@@ -43,6 +43,10 @@ public final class Records extends SQLiteOpenHelper {
     public synchronized void explanation(long id,int ply,JSONObject response,String text)throws JSONException {
         Saved old=find(id);if(old==null||ply<0||ply>=old.plies)return;
         JSONObject entry=old.analyses.optJSONObject(Integer.toString(ply));JSONObject all=entry==null?null:entry.optJSONObject("aiByModel");if(all==null)all=new JSONObject();
+        JSONObject cached=all.optJSONObject(response.getString("model"));JSONObject previous=cached==null?null:cached.optJSONObject("response");
+        if(previous==null&&entry!=null&&entry.optJSONObject("aiResponse")!=null&&response.getString("model").equals(entry.getJSONObject("aiResponse").optString("model")))previous=entry.getJSONObject("aiResponse");
+        response=CoachText.merge(previous,response);
+        if(response.has("explanation"))text=AnalysisJson.explanation(response);
         all.put(response.getString("model"),new JSONObject().put("response",response).put("text",text));
         patch(id,ply,new JSONObject().put("aiByModel",all).put("aiResponse",response).put("aiText",text));
     }
