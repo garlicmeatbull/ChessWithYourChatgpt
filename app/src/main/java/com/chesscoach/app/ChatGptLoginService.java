@@ -35,8 +35,8 @@ public final class ChatGptLoginService extends Service {
                 if(request==null||request.length()>16384){reply(socket,400,"Invalid callback");continue;}
                 String[] parts=request.split(" ",3);if(parts.length!=3||!parts[0].equals("GET")||!parts[1].startsWith("/auth/callback?")){reply(socket,404,"Not found");continue;}
                 ChatGptProtocol.Callback callback;
-                try{callback=ChatGptProtocol.callback(attempt,parts[1]);}catch(Exception e){reply(socket,400,"Sign-in could not be verified. Return to the app and retry.");throw e;}
-                reply(socket,200,"Login received. Return to Chess Coach to finish connecting.");phase="exchanging";browserUrl="";message="계정 서명과 사용 권한 확인 중…";
+                try{callback=ChatGptProtocol.callback(attempt,parts[1]);}catch(Exception e){reply(socket,400,"로그인 응답을 확인하지 못했습니다. 앱으로 돌아가 다시 시도하세요.");throw e;}
+                reply(socket,200,"로그인 응답을 받았습니다. Chess Coach 앱으로 돌아가면 연결을 확인합니다.");phase="exchanging";browserUrl="";message="계정 서명과 사용 권한 확인 중…";
                 accounts.accept(attempt,callback);if(cancelled)return;phase="done";message=ChatGptAccounts.connected(this)?"ChatGPT 계정 연결 완료 · 구독 사용 권한 허용됨":"계정 로그인 완료 · 구독 사용 권한을 추가로 허용하세요.";return;
             }catch(SocketTimeoutException timeout){if(phase.equals("exchanging"))throw timeout;}
         }
@@ -44,7 +44,7 @@ public final class ChatGptLoginService extends Service {
     }catch(Exception e){if(!cancelled){phase="failed";message=e instanceof ChatGptProtocol.ApiError?e.getMessage():"로그인을 완료하지 못했습니다. 브라우저와 네트워크를 확인하고 다시 시도하세요.";}}
     finally{browserUrl="";close();stopSelf();}}
     private static String requestLine(Reader in)throws IOException {StringBuilder line=new StringBuilder();int ch;while((ch=in.read())!=-1){if(ch=='\n')return line.toString().replace("\r","");if(line.length()>=16384)throw new IOException("Callback too large");line.append((char)ch);}return line.length()==0?null:line.toString();}
-    private static void reply(Socket socket,int status,String message)throws Exception {byte[] body=("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Chess Coach</title><p>"+message+"</p>").getBytes(StandardCharsets.UTF_8);OutputStream out=socket.getOutputStream();out.write(("HTTP/1.1 "+status+"\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: "+body.length+"\r\nCache-Control: no-store\r\nContent-Security-Policy: default-src 'none'\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));out.write(body);out.flush();}
+    private static void reply(Socket socket,int status,String message)throws Exception {byte[] body=("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'><title>Chess Coach</title><p>"+message+"</p>").getBytes(StandardCharsets.UTF_8);OutputStream out=socket.getOutputStream();out.write(("HTTP/1.1 "+status+" "+(status==200?"OK":status==400?"Bad Request":"Not Found")+"\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: "+body.length+"\r\nCache-Control: no-store\r\nContent-Security-Policy: default-src 'none'\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));out.write(body);out.flush();}
     private void close(){try{if(server!=null)server.close();}catch(IOException ignored){}}
     @Override public void onDestroy(){cancelled=true;close();jobs.shutdownNow();browserUrl="";if(running()){phase="cancelled";message="로그인을 취소했습니다.";}stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy();}
 }

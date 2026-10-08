@@ -23,6 +23,10 @@ public final class ChatGptAccounts {
         synchronized(ChatGptStore.LOCK){if(Thread.currentThread().isInterrupted())throw new java.io.IOException("로그인을 취소했습니다.");JSONObject all=store.read(),p=find(all,callback.client());for(String k:new String[]{"issuer","subject","email"})p.put(k,identity.get(k));replaceTokens(p,tokens,false);all.put("active",callback.client());store.write(all);clearModels();}
     }
     static void replaceTokens(JSONObject profile,JSONObject tokens,boolean refresh)throws Exception {
+        // Identity sign-in and permission to spend the ChatGPT plan are separate grants.
+        if(!refresh&&tokens.optString("access_token","").isEmpty()){
+            clearTokens(profile);profile.put("id_token",tokens.getString("id_token")).put("scope",tokens.optString("scope",""));return;
+        }
         if(!"Bearer".equalsIgnoreCase(tokens.getString("token_type"))||tokens.getString("access_token").isEmpty()||tokens.getLong("expires_in")<=0)throw new Exception("로그인 토큰 응답을 확인할 수 없습니다.");
         String scope=tokens.has("scope")?tokens.getString("scope"):refresh?profile.optString("scope",""):"";
         profile.put("access_token",tokens.getString("access_token")).put("scope",scope).put("expires_at",System.currentTimeMillis()+tokens.getLong("expires_in")*1000L).put("earliest_refresh_at",tokens.optLong("earliest_refresh_at",0)*1000L);
