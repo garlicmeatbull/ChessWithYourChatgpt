@@ -6,6 +6,7 @@
 - Android 11/API 30 x86_64 instrumentation 20개 통과. 실제 SQLite 기록 보존·Keystore 암호화/원자 저장·APK Stockfish·foreground loopback 준비와 위조 콜백 거부를 확인했습니다. 결과 `checks=20`, `result=PASS`, `INSTRUMENTATION_CODE=-1`. 서명 검증용 RSA 및 실제 OpenAI 계정은 JVM/수동 검증 범위를 따릅니다.
 - debug APK, Android test APK, release APK 빌드 및 Android lint 통과(오류 0). 릴리스 APK는 배포용 서명 검증 대상입니다.
 - 대응 소스 ZIP 생성과 NNUE·Java 의존성 소스 3개·원본 POM·고정 해시를 확인했습니다. APK/서명 키/이전 서버의 node_modules가 포함되지 않았습니다.
+- 연결 화면의 로그인·계정·모델 조회·응답 테스트·사용량 메뉴를 UI dump로 확인했습니다. 로그인 전 모델/응답 버튼은 disabled입니다. 소프트웨어 에뮬레이터에서 Home→연결 화면 전환 중 FocusEvent(hasFocus=false) 입력 시간 초과 ANR이 발생했습니다. 수집한 앱 UI 스레드는 MessageQueue.nativePollOnce 대기 상태였고 system_server 과부하도 관측됐습니다. 이 관측만으로 실기기에서 ANR이 없다고 보장하지 않으며 화면 전환 안정성은 실기기 확인 대상입니다.
 - 실제 사용자 OAuth 로그인·구독 응답은 미검증입니다. 사용자 자신의 계정으로 [Android 최소 기능 절차](siwc-android.md)를 수행해야 합니다. Android 14/15 이상의 실기기 브라우저 전환도 확인 대상입니다.
 - 앱의 서버 연결 구조와 설치 단계는 제거했습니다. 아래 0.1/0.2의 서버 검사 및 read-only Codex 홈 기록은 과거 구조의 기록입니다.
 
