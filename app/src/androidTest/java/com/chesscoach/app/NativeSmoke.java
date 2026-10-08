@@ -15,7 +15,7 @@ public final class NativeSmoke extends Instrumentation {
             @Override public android.content.SharedPreferences getSharedPreferences(String name,int mode){return super.getSharedPreferences("instrumentation-"+name,mode);}
         };
         try{
-            if(modeOnly){modeChecks();if(uiOnly)visualChecks();result.putString("result","PASS");result.putInt("checks",checks);java.nio.file.Files.write(new java.io.File(getTargetContext().getExternalFilesDir(null),"native-ui-result.txt").toPath(),("PASS checks="+checks).getBytes(java.nio.charset.StandardCharsets.UTF_8));finish(-1,result);return;}
+            if(modeOnly){if(uiOnly){sessionChecks();playChecks();}modeChecks();if(uiOnly)visualChecks();result.putString("result","PASS");result.putInt("checks",checks);java.nio.file.Files.write(new java.io.File(getTargetContext().getExternalFilesDir(null),"native-ui-result.txt").toPath(),("PASS checks="+checks).getBytes(java.nio.charset.StandardCharsets.UTF_8));finish(-1,result);return;}
             coachChecks();
             if(coachOnly){result.putString("result","PASS");result.putInt("checks",checks);finish(-1,result);return;}
             Pgn.Game game=Pgn.parse("1. e4 e5 2. Nf3 Nc6 *");
@@ -73,6 +73,35 @@ public final class NativeSmoke extends Instrumentation {
         if(root instanceof android.view.ViewGroup group)for(int i=0;i<group.getChildCount();i++){android.view.View found=find(group.getChildAt(i),toggle);if(found!=null)return found;}
         return null;
     }
+    private void awaitBoard(android.app.Activity a)throws Exception{long until=System.currentTimeMillis()+45000;boolean[] ready={false};while(System.currentTimeMillis()<until){runOnMainSync(()->ready[0]=type(a.getWindow().getDecorView(),BoardView.class)!=null);if(ready[0]){settle(a);return;}Thread.sleep(100);}throw new AssertionError("Review did not finish loading");}
+    private void settle(android.app.Activity a)throws Exception{java.util.concurrent.CountDownLatch frame=new java.util.concurrent.CountDownLatch(1);runOnMainSync(()->a.getWindow().getDecorView().postOnAnimation(()->a.getWindow().getDecorView().post(frame::countDown)));if(!frame.await(30,java.util.concurrent.TimeUnit.SECONDS))throw new AssertionError("Layout frame timed out");waitForIdleSync();}
+    private android.graphics.Rect boardBounds(android.app.Activity a){var board=(BoardView)type(a.getWindow().getDecorView(),BoardView.class);int[] location=new int[2];board.getLocationOnScreen(location);return new android.graphics.Rect(location[0],location[1],location[0]+board.getWidth(),location[1]+board.getHeight());}
+    private void sessionChecks()throws Exception{
+        String name="instrumentation-session-records.db";getTargetContext().deleteDatabase(name);long parent,child;
+        try(Records db=new Records(getTargetContext(),name)){
+            Pgn.Game source=Pgn.parse("1. e4 e5 2. Nf3 Nc6 1-0");parent=db.create("Original","imported",source);db.patch(parent,0,new JSONObject().put("local","engine evidence").put("aiText","saved coach"));db.highlights(parent,Collections.singletonList(new Highlights.Finding(0,"focus","why","planning",70)));
+            child=db.branch(parent,source,1);check(db.find(child).title().endsWith(" · 분기"),"branch creates a separately named record");check(db.find(parent).plies()==4&&db.find(child).plies()==1,"branch leaves original mainline intact");check(db.find(child).analyses().getJSONObject("0").getString("aiText").equals("saved coach")&&db.find(child).highlights().length()==1,"branch keeps prefix explanations and highlights");db.rename(child,"My training");check(db.find(child).title().equals("My training"),"record rename stored in SQLite");
+        }
+        try(Records db=new Records(getTargetContext(),name)){
+            var branch=Pgn.parse(db.find(child).pgn());check(branch.result().equals("*")&&!GameSession.playerWhite(branch)&&branch.plies().get(0).after().equals(Pgn.parse(db.find(parent).pgn()).plies().get(0).after()),"position and player color survive database reopen");db.updateGame(child,new Pgn.Game(branch.initial(),branch.plies(),branch.tags(),"1-0"));check(Pgn.parse(db.find(child).pgn()).result().equals("1-0"),"resignation result survives persistent record update");db.delete(child);check(db.find(child)==null&&db.find(parent)!=null,"delete removes selected record and retains parent");
+        }finally{getTargetContext().deleteDatabase(name);}
+        var isolated=new android.content.ContextWrapper(getTargetContext()){@Override public android.content.SharedPreferences getSharedPreferences(String name,int mode){return super.getSharedPreferences("instrumentation-session-"+name,mode);}};var prefs=isolated.getSharedPreferences("coach",0);Records db=Records.get(getTargetContext());long active=db.create("instrumentation resume","played",new Pgn.Game(Chess.START,Collections.emptyList(),Map.of("CoachPlayer","white"),"*"));
+        try{prefs.edit().putLong("activeRecord",active).commit();check(GameSession.available(isolated),"even an unfinished zero-move game is resumable from disk");db.updateGame(active,new Pgn.Game(Chess.START,Collections.emptyList(),Map.of("CoachPlayer","white"),"0-1"));check(!GameSession.available(isolated),"finished game does not offer resume");db.delete(active);check(!GameSession.available(isolated),"deleted game does not offer resume");}finally{db.delete(active);prefs.edit().clear().commit();}
+    }
+    private void playChecks()throws Exception{
+        var prefs=getTargetContext().getSharedPreferences("coach",0);var appearance=getTargetContext().getSharedPreferences("appearance",0);
+        java.util.Map<String,Object> backup=new java.util.HashMap<>();for(String key:new String[]{"activeRecord","moves","feedback","autoCoach"})backup.put(key,prefs.getAll().get(key));String oldTheme=appearance.getString("theme",null);
+        Records db=Records.get(getTargetContext());var prefix=GameSession.prefix(Pgn.parse("1. e4 e5 2. Nf3 Nc6 *"),1);long id=db.create("instrumentation black resume","played",prefix);db.patch(id,0,new JSONObject().put("details",new JSONObject()).put("payload",new JSONObject()));android.app.Activity[] activity={null};
+        try{
+            prefs.edit().putBoolean("autoCoach",false).commit();appearance.edit().putString("theme","light").commit();activity[0]=startActivitySync(new android.content.Intent(getTargetContext(),MainActivity.class).putExtra("resumeRecord",id).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));awaitBoard(activity[0]);
+            java.lang.reflect.Field gameField=MainActivity.class.getDeclaredField("game"),side=MainActivity.class.getDeclaredField("playerWhite"),busy=MainActivity.class.getDeclaredField("busy");gameField.setAccessible(true);side.setAccessible(true);busy.setAccessible(true);java.lang.reflect.Method select=MainActivity.class.getDeclaredMethod("select",int.class);select.setAccessible(true);
+            runOnMainSync(()->{try{check(((Chess)gameField.get(activity[0])).fen().equals(prefix.plies().get(0).after())&&!side.getBoolean(activity[0]),"play restores recorded position and Black player from SQLite");check((activity[0].getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_NO,"in-app light preference overrides system theme");busy.setBoolean(activity[0],false);select.invoke(activity[0],52);var board=(BoardView)type(activity[0].getWindow().getDecorView(),BoardView.class);check(board.selected==52,"Black player can select own pawn after branching");select.invoke(activity[0],16);check(board.selected==-1&&board.targets.isEmpty(),"empty non-destination square clears piece and targets");activity[0].finish();}catch(ReflectiveOperationException e){throw new AssertionError(e);}});waitForIdleSync();
+            appearance.edit().putString("theme","dark").commit();activity[0]=startActivitySync(new android.content.Intent(getTargetContext(),MainActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));awaitBoard(activity[0]);
+            runOnMainSync(()->{try{check(((Chess)gameField.get(activity[0])).fen().equals(prefix.plies().get(0).after())&&(activity[0].getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES,"Activity restart retains position and applies saved dark preference");}catch(ReflectiveOperationException e){throw new AssertionError(e);}});
+        }finally{
+            if(activity[0]!=null){runOnMainSync(()->activity[0].finish());waitForIdleSync();}db.delete(id);var edit=prefs.edit();for(var entry:backup.entrySet()){Object value=entry.getValue();if(value==null)edit.remove(entry.getKey());else if(value instanceof Long number)edit.putLong(entry.getKey(),number);else if(value instanceof Boolean flag)edit.putBoolean(entry.getKey(),flag);else edit.putString(entry.getKey(),value.toString());}edit.commit();if(oldTheme==null)appearance.edit().remove("theme").commit();else appearance.edit().putString("theme",oldTheme).commit();
+        }
+    }
     private void modeChecks()throws Exception {
         var prefs=getTargetContext().getSharedPreferences("coach",0);boolean existed=prefs.contains("autoCoach"),old=prefs.getBoolean("autoCoach",false);
         // Stay at the starting position: no selected ply, engine analysis or AI request.
@@ -80,7 +109,7 @@ public final class NativeSmoke extends Instrumentation {
         try{
             prefs.edit().putBoolean("autoCoach",false).commit();
             var intent=new android.content.Intent(getTargetContext(),ReviewActivity.class).putExtra("recordId",id).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-            activity[0]=startActivitySync(intent);waitForIdleSync();
+            activity[0]=startActivitySync(intent);awaitBoard(activity[0]);
             runOnMainSync(()->{
                 var root=activity[0].getWindow().getDecorView();var toggle=(android.widget.Switch)find(root,true);var judge=find(root,false);
                 check(toggle!=null&&judge!=null,"native automation switch and manual judgment button exist");
@@ -88,7 +117,7 @@ public final class NativeSmoke extends Instrumentation {
                 toggle.performClick();check(prefs.getBoolean("autoCoach",false)&&judge.getVisibility()==android.view.View.GONE,"switch click persists ON and hides judgment immediately");
                 activity[0].finish();
             });
-            activity[0]=startActivitySync(intent);waitForIdleSync();
+            activity[0]=startActivitySync(intent);awaitBoard(activity[0]);
             runOnMainSync(()->{
                 var root=activity[0].getWindow().getDecorView();var toggle=(android.widget.Switch)find(root,true);var judge=find(root,false);
                 check(toggle.isChecked()&&judge.getVisibility()==android.view.View.GONE,"reopened Activity restores ON and hidden judgment button");
@@ -115,16 +144,21 @@ public final class NativeSmoke extends Instrumentation {
             var best=new Stockfish.Line(1,20,0,null,Arrays.asList("b1c3","d7d6"));var actual=new Stockfish.Line(1,20,-30000,-1,Arrays.asList("g2g4","d8h4"));var analysis=new Stockfish.Analysis("b1c3",Collections.singletonList(best));
             db.patch(id,2,new JSONObject().put("details",AnalysisJson.details(analysis,actual,null)).put("payload",new JSONObject()).put("local","블런더 · g4"));
             var response=new JSONObject().put("model",Ui.model(getTargetContext())).put("explanation",new JSONObject().put("headline","h4의 체크메이트를 놓쳤어요").put("summary","g4로 킹이 노출됐어요. 흑의 `Qh4#`에 체크메이트가 되므로 먼저 킹의 안전을 확인하세요."));db.explanation(id,2,response,"fixture");
-            activity[0]=startActivitySync(new android.content.Intent(getTargetContext(),ReviewActivity.class).putExtra("recordId",id).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
+            activity[0]=startActivitySync(new android.content.Intent(getTargetContext(),ReviewActivity.class).putExtra("recordId",id).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));awaitBoard(activity[0]);
             runOnMainSync(()->{var next=label(activity[0].getWindow().getDecorView(),"다음 ›");for(int i=0;i<3;i++)next.performClick();});waitForIdleSync();
             runOnMainSync(()->{
                 var root=activity[0].getWindow().getDecorView();var board=(BoardView)type(root,BoardView.class);check("d8h4".equals(board.aiArrow)&&board.board.fen().equals(game.plies().get(2).after()),"AI threat arrow belongs to the displayed position");
                 var outcome=type(root,OutcomeView.class);check(outcome.getVisibility()==android.view.View.GONE,"rewinding leaves the board available instead of a game-over banner");
                 var link=label(root,"↗ AI 수 보기");check(link!=null&&link.getVisibility()==android.view.View.VISIBLE,"legal explanation has a native variation preview link");
             });
+            var panelFieldFixed=ReviewActivity.class.getDeclaredField("coachPanel");panelFieldFixed.setAccessible(true);CoachPanel fixedPanel=(CoachPanel)panelFieldFixed.get(activity[0]);android.graphics.Rect[] anchor={null};runOnMainSync(()->anchor[0]=boardBounds(activity[0]));
+            runOnMainSync(()->fixedPanel.bind("layout-test","짧은 핵심", String.join("",Collections.nCopies(100,"긴 조언 ")),"fixture",true,false,null));settle(activity[0]);runOnMainSync(()->check(anchor[0].equals(boardBounds(activity[0])),"long streaming advice does not move or resize board"));
+            runOnMainSync(()->fixedPanel.bind("layout-test","", "", "",false,false,null));settle(activity[0]);runOnMainSync(()->check(anchor[0].equals(boardBounds(activity[0])),"empty advice does not move or resize board"));
+            runOnMainSync(()->label(activity[0].getWindow().getDecorView(),"‹ 이전").performClick());runOnMainSync(()->label(activity[0].getWindow().getDecorView(),"다음 ›").performClick());settle(activity[0]);
             boolean night=(getTargetContext().getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;String theme=night?"dark":"light";
             screenshot(activity[0].getWindow(),"native-preview-"+theme+".png");
             runOnMainSync(()->{var root=activity[0].getWindow().getDecorView();label(root,"다음 ›").performClick();var outcome=type(root,OutcomeView.class);check(outcome.getVisibility()==android.view.View.VISIBLE&&outcome.getContentDescription().toString().startsWith("패배"),"played game loss is prominently visible at the final move");});waitForIdleSync();
+            settle(activity[0]);runOnMainSync(()->check(anchor[0].equals(boardBounds(activity[0])),"game result does not move or resize review board"));
             screenshot(activity[0].getWindow(),"native-result-"+theme+".png");
             runOnMainSync(()->{var root=activity[0].getWindow().getDecorView();label(root,"‹ 이전").performClick();label(root,"↗ AI 수 보기").performClick();});waitForIdleSync();
             var panelField=ReviewActivity.class.getDeclaredField("coachPanel");panelField.setAccessible(true);CoachPanel panel=(CoachPanel)panelField.get(activity[0]);var dialogField=CoachPanel.class.getDeclaredField("visualDialog");dialogField.setAccessible(true);android.app.Dialog popup=(android.app.Dialog)dialogField.get(panel);

@@ -13,13 +13,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".MainActivity" android:exported="false" android:configChanges="orientation|screenSize" />
+        <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="false" android:configChanges="orientation|screenSize" />
         <activity android:name=".GameSetupActivity" android:exported="false" />
         <activity android:name=".ConnectionActivity" android:exported="false" />
         <service android:name=".ChatGptLoginService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Short-lived local OAuth callback listener while the user signs in through the system browser" />
         </service>
-        <activity android:name=".ReviewActivity" android:exported="false" android:configChanges="orientation|screenSize" />
+        <activity android:name=".ReviewActivity" android:screenOrientation="portrait" android:exported="false" android:configChanges="orientation|screenSize" />
         <activity android:name=".ImportActivity" android:exported="false" />
         <activity android:name=".RecordsActivity" android:exported="false" android:configChanges="orientation|screenSize" />
     </application>

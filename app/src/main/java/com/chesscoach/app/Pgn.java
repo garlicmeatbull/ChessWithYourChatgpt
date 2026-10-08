@@ -10,6 +10,8 @@ public final class Pgn {
         public String export() {
             StringBuilder s=new StringBuilder("[Event \"Chess Coach\"]\n");
             if(!initial.equals(Chess.START))s.append("[SetUp \"1\"]\n[FEN \"").append(initial).append("\"]\n");
+            if(tags.containsKey("CoachPlayer"))s.append("[CoachPlayer \"").append(tags.get("CoachPlayer").equals("black")?"black":"white").append("\"]\n");
+            if(tags.containsKey("CoachBranchStart")&&tags.get("CoachBranchStart").matches("[0-9]{1,3}"))s.append("[CoachBranchStart \"").append(tags.get("CoachBranchStart")).append("\"]\n");
             s.append("[Result \"").append(result).append("\"]\n\n");
             for(int i=0;i<plies.size();i++){Ply p=plies.get(i);if(p.white)s.append(p.number).append(". ");else if(i==0)s.append(p.number).append("... ");s.append(p.san).append(' ');}
             return s.append(result).toString();

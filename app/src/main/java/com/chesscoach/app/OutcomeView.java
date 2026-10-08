@@ -9,6 +9,7 @@ import android.widget.*;
 final class OutcomeView extends LinearLayout {
     private final TextView title,detail;
     OutcomeView(Context c){super(c);setOrientation(VERTICAL);setPadding(Ui.dp(c,16),Ui.dp(c,12),Ui.dp(c,16),Ui.dp(c,12));title=Ui.text(c,"",24,true);detail=Ui.text(c,"",12,false);addView(title);addView(detail);setVisibility(GONE);setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);}
+    void compact(){setPadding(Ui.dp(getContext(),12),0,Ui.dp(getContext(),12),0);setOrientation(HORIZONTAL);setGravity(android.view.Gravity.CENTER_VERTICAL);title.setTextSize(22);detail.setTextSize(11);detail.setPadding(Ui.dp(getContext(),12),0,0,0);detail.setMaxLines(1);detail.setEllipsize(android.text.TextUtils.TruncateAt.END);detail.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1));}
     void bind(GameOutcome outcome){
         if(outcome==null){setVisibility(GONE);return;}
         setVisibility(VISIBLE);Context c=getContext();boolean win=outcome.kind()==GameOutcome.Kind.WIN,loss=outcome.kind()==GameOutcome.Kind.LOSS;

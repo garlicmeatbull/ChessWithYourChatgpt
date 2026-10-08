@@ -35,3 +35,16 @@ LLM 해설은 제한된 엔진 검색에 대한 해석입니다. `MoveJudgment`�
 `CoachVisual`은 응답에 이미 있는 SAN/UCI를 정규식으로 읽고 실제 저장된 엔진 PV를 최대 6반수까지 재생합니다. 매 이동의 합법성을 검사하고 SAN에 대응되는 국면·이동만 `Scene`으로 남깁니다. 잘못된 수를 만나면 해당 가지를 중단하며 실전 수 이후의 대응을 우선하고 중복을 제거합니다. 현재 보드의 position key와 맞는 장면만 보라색 AI 화살표로 표시합니다. 다른 국면의 장면은 `CoachVisualDialog`에서 별도 복사 보드로 보여주므로 대국·기록·API를 변경하지 않습니다. 모델이나 선택한 수를 바꾸면 예전 미리보기를 닫습니다.
 
 `GameOutcome`은 직접 대국의 백 사용자 관점과 가져온 기보의 중립 관점을 구분합니다. `OutcomeView`는 대국 종료 및 복기의 마지막 수에서 큰 결과명·기호·사유를 표시합니다. 중간 수를 복기할 때는 숨기고 판 높이를 다시 계산합니다. 코칭의 판단·시각화·상세 버튼은 한 줄에 배치해 판 공간을 유지합니다. 기록 목록은 저장된 Result 태그만 읽어 결과를 표시하며 목록을 그리기 위해 모든 기보를 재생하지 않습니다. 시스템 라이트/다크 리소스는 같은 의미 색상 이름과 공통 `Ui` 컴포넌트를 사용합니다.
+
+
+## 0.5.0 local sessions and layout
+
+`ThemedActivity` wraps each Activity context with the saved night-mode preference. `Appearance` stores system/light/dark and an independent animation flag (default false). Changing theme recreates the Activity; play state is restored from SQLite and review retains its selected ply.
+
+The coach occupies a fixed 210dp scrollable slot. The playing/review board sits in its own remaining-height frame. Review analysis, notation, highlights and continuation actions live in the separate tools dialog; result banners reuse a fixed footer slot. Advice visibility and streaming do not affect board geometry.
+
+`coach.activeRecord` is a synchronously committed pointer to a SQLite game. Every move is committed to the record before updating the pointer; unfinished zero-move games are records too. The PGN, including initial FEN and `CoachPlayer`, is authoritative during restoration. A prior Activity cannot overwrite a newer active session or recreate a deleted record. Resignation invalidates pending engine callbacks, persists the result and prevents further moves. Opponent work is admitted only once per pending turn; callbacks verify the original FEN and move legality before applying a reply after a pause/resume.
+
+`Records.branch` transactionally creates a prefix game and copies only prefix analyses/highlights. `CoachBranchStart` persists the undo boundary and `CoachPlayer` preserves the assigned side through PGN export/replay. Original records remain independent. Record lists and PGN parsing load off the UI thread with generation guards against stale loads.
+
+`ModelPolicy` selects only among the authenticated account's catalog and preserves the explicit preferred slug. Model guidance is a task-fit heuristic, with no claimed latency benchmark or subscription-usage conversion. Animation uses a local 180ms ValueAnimator, including castling rook movement; pawn promotion renders the pawn in motion and the promoted piece at completion. No AI requests are made for animation or arrow extraction.

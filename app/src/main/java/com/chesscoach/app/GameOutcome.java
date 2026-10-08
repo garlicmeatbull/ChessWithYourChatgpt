@@ -16,5 +16,6 @@ record GameOutcome(String title,String detail,Kind kind) {
             default->null;
         };
     }
+    static GameOutcome forPlayer(String result,boolean white,String terminal){GameOutcome neutral=from(result,false,terminal);if(neutral==null||neutral.kind()==Kind.DRAW)return neutral;boolean won=result.equals(white?"1-0":"0-1");return new GameOutcome(won?"승리":"패배",neutral.detail(),won?Kind.WIN:Kind.LOSS);}
     static GameOutcome live(String terminal){return from(terminal==null?"*":terminal.startsWith("백 승리")?"1-0":terminal.startsWith("흑 승리")?"0-1":"1/2-1/2",true,terminal);}
 }

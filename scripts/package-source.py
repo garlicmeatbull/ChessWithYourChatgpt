@@ -13,7 +13,7 @@ assert (root / net).is_file(), 'Run scripts/stockfish-assets.py first'
 files.append(net)
 subprocess.run([sys.executable, str(root / "scripts/java-sources.py")],check=True)
 files.extend("vendor/java/"+item["name"] for item in json.loads((root / "vendor/java/sources.json").read_text()))
-output = root / 'artifacts/ChessCoach-0.4.2-source.zip'
+output = root / 'artifacts/ChessCoach-0.5.0-source.zip'
 output.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
     for name in sorted(set(files)):

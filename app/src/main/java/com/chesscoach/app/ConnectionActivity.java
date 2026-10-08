@@ -10,7 +10,7 @@ import android.widget.*;
 import org.json.*;
 import java.util.concurrent.*;
 /** Native account controls; browser login and inference run entirely on this phone. */
-public final class ConnectionActivity extends Activity {
+public final class ConnectionActivity extends ThemedActivity {
     private final ExecutorService jobs=Executors.newSingleThreadExecutor();private final Handler handler=new Handler(Looper.getMainLooper());
     private ChatGptAccounts accounts;private TextView status,account;private Button login,model,test,cancel;private boolean destroyed=false,resumed=false,working=false;private String handled="";
     @Override public void onCreate(Bundle state){super.onCreate(state);accounts=new ChatGptAccounts(this);LinearLayout root=Ui.screen(this,true);Ui.header(this,root,"AI 코치");root.addView(Ui.text(this,"내 ChatGPT 계정으로,\n한 수의 이유를 이해하세요.",27,true));Ui.gap(root,12);root.addView(Ui.text(this,"서버나 API 키 없이 이 휴대폰에서 직접 연결합니다. Stockfish 대국과 분석은 로그인 없이도 이용할 수 있어요.",15,false));Ui.gap(root,20);
