@@ -1,3 +1,12 @@
+# 0.6.1 문단별 실시간 시각화 검증 (2026-10-09)
+
+- `testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug`: 성공. JVM **81개**, 실패/오류/스킵 0. Lint 오류 0, 경고 36. 앱과 instrumentation APK 빌드 성공.
+- 새 JVM 검사 8개: 모든 스트리밍 경계의 내부 표기 비노출, 알 수 없는·중첩·미완성 표기 숨김, 설명과 그림 연결, 실제 이후 국면의 합법적인 화살표, 없는 ID·중복 거부, 불법 PV의 중단, 안정적인 그림 목록과 모델 임의 FEN 차단, 기존 전략 해설 호환성.
+- 시각화 팝업은 열린 상태에서도 최신 응답을 반영합니다. 문단별 글·판을 재사용하며 완성된 ID와 검증된 엔진 수순에 한해 그림을 표시합니다. 그림을 위한 별도 모델 요청은 없습니다.
+- 스크롤 중 갱신은 최신 한 개만 보류하고 움직임이 멎으면 반영합니다. 출력 반영 간격은 약 180ms이며 마지막 응답은 온전히 저장합니다. 생성 중 반복 SQLite 조회·수순 계산·동일한 Markdown 렌더링을 줄였습니다.
+- 팝업 실시간 갱신·표기 숨김·기존 판 재사용 instrumentation 검사를 추가하고 컴파일했습니다. **기기 실행은 미실행**입니다. 클라우드 소프트웨어 에뮬레이터가 ADB에 응답하지 않아 과거 PASS를 재사용하지 않습니다.
+- 실제 휴대폰의 스크롤 FPS·긴 설명·그림 선택 품질과 실제 계정의 응답 시간은 측정하지 않았습니다. 렉이 완전히 사라졌다고 주장하지 않습니다. 새 외부 의존성은 없으며 대응 소스·라이선스 제공을 유지합니다.
+
 # 0.6.0 전략 코칭·평가 바 검증 (2026-10-09)
 
 - `testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug`: 성공. JVM **73개**, 실패/오류/스킵 0. Lint 오류 0, 경고 39. 앱과 instrumentation APK 빌드 성공.

@@ -23,7 +23,7 @@ public final class ReviewActivity extends ThemedActivity {
     private final Map<Integer,Pending> pending=new ConcurrentHashMap<>();
     private SharedPreferences coachPrefs;private CoachMode coachMode;private boolean selectedAnalyzing;
     private final SharedPreferences.OnSharedPreferenceChangeListener modeListener=(p,k)->{if("autoCoach".equals(k)&&!destroyed)automationChanged();};
-    private OutcomeView outcomeView;private GameOutcome finalOutcome;private CoachPanel coachPanel;private List<CoachVisual.Scene> coachScenes=Collections.emptyList();private String visualKey="";
+    private OutcomeView outcomeView;private GameOutcome finalOutcome;private CoachPanel coachPanel;private List<CoachVisual.Scene> coachScenes=Collections.emptyList();private String visualKey="",catalogKey="";private JSONObject visualDetails;private int catalogPly=-1;private Map<String,CoachVisual.Scene> diagramCatalog=Collections.emptyMap();
     private long recordId;
     private Pgn.Game game;
     private Records records;
@@ -99,12 +99,14 @@ public final class ReviewActivity extends ThemedActivity {
         String core="";String full=streaming&&!job.text.isEmpty()?job.text:ai!=null?CoachText.markdown(ai):summary;
         coachPanel.updateAutomation(!game.plies().isEmpty()&&!selectedAnalyzing&&!streaming&&(!analyzing||e!=null&&e.has("details")));
         coachPanel.bind(model+":"+index,core,summary,full,streaming,ai!=null,job!=null&&!job.text.trim().isEmpty(),()->{if(index>0)requestExplanation(index-1,true,true,true);});
-        String visualText=streaming&&!job.text.isEmpty()?job.text:ai!=null?CoachText.markdown(ai):"";JSONObject detail=e==null?null:e.optJSONObject("details");String key=index+":"+model+":"+visualText+":"+detail;
-        if(!key.equals(visualKey)){visualKey=key;coachScenes=Collections.emptyList();try{if(index>0&&detail!=null){var ply=game.plies().get(index-1);var analysis=AnalysisJson.analysis(detail.getJSONObject("analysis"));var actual=detail.isNull("playedScore")?null:AnalysisJson.line(detail.getJSONObject("playedScore"));coachScenes=CoachVisual.find(new Chess(ply.before()),ply.uci(),analysis.lines(),actual,visualText);}}catch(Exception ignored){}}
-        coachPanel.visuals(coachScenes,visualText);updateVisualOnBoard();
+        String visualText=streaming&&!job.text.isEmpty()?job.text:ai!=null?CoachText.markdown(ai):"";JSONObject detail=e==null?(catalogPly==index?visualDetails:null):e.optJSONObject("details");
+        if(e!=null||catalogPly!=index){String sourceKey=index+":"+detail;if(!sourceKey.equals(catalogKey)){catalogKey=sourceKey;catalogPly=index;visualDetails=detail;diagramCatalog=index==0?Collections.emptyMap():CoachDiagrams.catalog(new Chess(game.plies().get(index-1).before()),detail);}}
+        String key=index+":"+model+":"+visualText+":"+catalogKey;if(!key.equals(visualKey)){visualKey=key;coachScenes=CoachDiagrams.selected(diagramCatalog,visualText);if(!streaming&&!CoachText.visualLesson(ai)&&coachScenes.isEmpty())try{if(index>0&&detail!=null){var ply=game.plies().get(index-1);var analysis=AnalysisJson.analysis(detail.getJSONObject("analysis"));var actual=detail.isNull("playedScore")?null:AnalysisJson.line(detail.getJSONObject("playedScore"));coachScenes=CoachVisual.find(new Chess(ply.before()),ply.uci(),analysis.lines(),actual,visualText);}}catch(Exception ignored){}}
+        coachPanel.visuals(coachScenes,visualText,diagramCatalog);updateVisualOnBoard();
+
 
     }
-    private void updateVisualOnBoard(){var scene=CoachVisual.onBoard(coachScenes,board.board);board.aiArrow=scene==null?null:scene.move();board.invalidate();}
+    private void updateVisualOnBoard(){var scene=CoachVisual.onBoard(coachScenes,board.board);String arrow=scene==null?null:scene.move();if(!Objects.equals(board.aiArrow,arrow)){board.aiArrow=arrow;board.invalidate();}}
     private JSONObject analyzePly(int ply)throws Exception {
         JSONObject saved=entry(ply);if(saved!=null&&saved.has("details")&&saved.has("payload"))return saved;
         ensureEngine();var p=game.plies().get(ply);Chess before=new Chess(p.before()),after=new Chess(p.after());
@@ -152,7 +154,7 @@ public final class ReviewActivity extends ThemedActivity {
     private void requestExplanation(int ply,boolean detail,boolean foreground,boolean explicit){
         CoachMode.Ticket ticket=coachMode.admit(explicit);if(ticket==null)return;
         JSONObject saved=entry(ply);String model=Ui.model(this);JSONObject ai=cached(saved,model);Pending old=pending.get(ply);
-        if(saved==null||CoachText.lesson(ai))return;
+        if(saved==null||CoachText.visualLesson(ai))return;
         if(old!=null&&model.equals(old.model)&&(!foreground||old.foreground||old.running))return;
         if(!ChatGptAccounts.connected(this))return;
         JSONObject payload;try{payload=new JSONObject(saved.getJSONObject("payload").toString());payload.put("model",model).put("detail",detail);JSONArray hs=records.find(recordId).highlights();for(int i=0;i<hs.length();i++){JSONObject f=hs.getJSONObject(i);if(f.getInt("ply")==ply)payload.put("learningFocus",f.getString("focus"));}}catch(Exception e){return;}
@@ -161,7 +163,7 @@ public final class ReviewActivity extends ThemedActivity {
             var snapshot=records.find(recordId);if(snapshot==null)throw new java.io.IOException("삭제된 대국입니다.");JSONObject contextual=CoachContext.attach(payload,game,ply+1,GameSession.playerWhite(game),snapshot.analyses());
             JSONObject result=client.request("/v1/explain",contextual,partial->{
                 if(destroyed||pending.get(ply)!=job)throw new java.io.InterruptedIOException("해설 요청이 바뀌었습니다.");
-                runOnUiThread(()->{if(!destroyed&&pending.get(ply)==job){job.text=partial;if(index==ply+1&&model.equals(Ui.model(this))){JSONObject e=entry(ply);renderCoach(e,cached(e,model),model);}}});
+                runOnUiThread(()->{if(!destroyed&&pending.get(ply)==job){job.text=partial;if(index==ply+1&&model.equals(Ui.model(this))){renderCoach(null,null,model);}}});
             });
             if(!destroyed&&pending.get(ply)==job)records.explanation(recordId,ply,result,AnalysisJson.explanation(result));
         }catch(Exception e){String message=e.getMessage()==null?"해설 연결을 확인해 주세요.":e.getMessage();runOnUiThread(()->{if(!destroyed&&pending.get(ply)==job){status.setText(message);if(detail)try{records.patch(recordId,ply,new JSONObject().put("detailErrorModel",model).put("detailError",message));}catch(Exception ignored){}}});}

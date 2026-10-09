@@ -7,13 +7,16 @@ import java.util.regex.*;
 
 /** Native spans for coaching headings, emphasis, lists and inline chess notation. No HTML/WebView. */
 final class CoachMarkdown {
+    private static final Pattern HEADING=Pattern.compile("^#{1,3}\\s+(.+)$"),BULLET=Pattern.compile("^\\s*[-*]\\s+");
+    static void update(android.widget.TextView view,String raw){String visible=CoachDiagrams.visible(raw);if(visible.equals(view.getTag()))return;view.setTag(visible);view.setText(render(visible));}
     static CharSequence render(String markdown){
+        markdown=CoachDiagrams.visible(markdown);
         SpannableStringBuilder out=new SpannableStringBuilder();
         for(String line:markdown.split("\n",-1)){
             if(out.length()>0)out.append('\n');
-            Matcher heading=Pattern.compile("^#{1,3}\\s+(.+)$").matcher(line);
+            Matcher heading=HEADING.matcher(line);
             boolean title=heading.matches();if(title)line=heading.group(1);
-            line=line.replaceFirst("^\\s*[-*]\\s+","• ");int start=out.length();inline(out,line);
+            line=BULLET.matcher(line).replaceFirst("• ");int start=out.length();inline(out,line);
             if(title){out.setSpan(new StyleSpan(Typeface.BOLD),start,out.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);out.setSpan(new RelativeSizeSpan(1.1f),start,out.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}
         }
         return out;

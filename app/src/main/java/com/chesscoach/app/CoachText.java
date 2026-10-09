@@ -60,6 +60,7 @@ public final class CoachText {
         result.put(fresh.has("summary")?"summaryUsage":"detailUsage",incoming.opt("usage")==null?JSONObject.NULL:incoming.opt("usage"));
         return result;
     }
+    public static boolean visualLesson(JSONObject cache){JSONObject response=cache==null?null:cache.optJSONObject("response");return lesson(cache)&&response!=null&&response.optInt("visualVersion")>=1;}
     public static boolean lesson(JSONObject cache){JSONObject e=explanation(cache);return e!=null&&e.has("strategy")&&e.has("continuation")&&e.has("principle");}
     public static boolean detailed(JSONObject cache){JSONObject e=explanation(cache);return lesson(cache)||e!=null&&e.has("flow")&&e.has("bestMoveReason")&&e.has("plan")||cache!=null&&e==null&&!cache.optString("text").isEmpty();}
     public static String summary(JSONObject cache){JSONObject e=explanation(cache);if(e!=null)return e.has("summary")?e.optString("summary"):shorten(e.optString("flow"));return shorten(legacy(cache==null?"":cache.optString("text")));}

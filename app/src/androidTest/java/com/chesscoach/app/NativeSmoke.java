@@ -169,6 +169,14 @@ public final class NativeSmoke extends Instrumentation {
             runOnMainSync(()->{var root=activity[0].getWindow().getDecorView();label(root,"‹ 이전").performClick();label(root,"↗ AI 수 보기").performClick();});waitForIdleSync();
             var panelField=ReviewActivity.class.getDeclaredField("coachPanel");panelField.setAccessible(true);CoachPanel panel=(CoachPanel)panelField.get(activity[0]);var dialogField=CoachPanel.class.getDeclaredField("visualDialog");dialogField.setAccessible(true);android.app.Dialog popup=(android.app.Dialog)dialogField.get(panel);
             runOnMainSync(()->check(popup!=null&&popup.isShowing(),"native AI variation preview opens without model inference"));screenshot(popup.getWindow(),"native-variation-"+theme+".png");
+            runOnMainSync(()->{
+                var live=(CoachVisualDialog.Live)popup;Chess start=new Chess();Chess next=start.copy();next.play(Chess.Move.parse("e2e4"));
+                var catalog=java.util.Map.of("a0",new CoachVisual.Scene(start.fen(),"e2e4","e4","전개","1. e4",null),"a1",new CoachVisual.Scene(next.fen(),"e7e5","e5","중앙","1. e4 e5","e2e4"));
+                panel.visuals(java.util.List.of(),"첫 설명{viz:a0}",catalog);var root=live.getWindow().getDecorView();var first=type(root,BoardView.class);
+                check(label(root,"첫 설명")!=null,"streamed diagram metadata is hidden from prose");
+                panel.visuals(java.util.List.of(),"첫 설명{viz:a0}둘째 설명{viz:a1}",catalog);
+                check(label(root,"둘째 설명")!=null&&type(root,BoardView.class)==first,"open visualization receives streamed explanations and reuses its first board");
+            });waitForIdleSync();
             runOnMainSync(panel::close);waitForIdleSync();
         }finally{
             if(activity[0]!=null){runOnMainSync(()->activity[0].finish());waitForIdleSync();}
