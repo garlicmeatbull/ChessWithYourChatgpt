@@ -1,3 +1,11 @@
+# 0.5.2 기보 목록·AI 수 보기 검증 (2026-10-09)
+
+- `testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug`: 성공. 기존 JVM 검사 62개, 실패/오류/스킵 0. Lint 오류 0, 경고 37. 앱과 instrumentation APK를 빌드했습니다. 이 UI 변경에 테스트 의존성을 추가하지 않았습니다.
+- 대국의 기존 가로 기보를 유지하고 별도 기보 목록을 추가했습니다. 백/흑 SAN을 실제 fullmove 번호로 정렬하며 흑부터 시작하는 FEN은 백 칸을 비워 둡니다. ListView는 행을 재사용하고 선택한 수 주변을 처음 표시합니다. 대국 중 선택한 수는 저장된 기록의 복기 위치로 전달하며 현재 대국을 변경하지 않습니다.
+- 기보 목록 열기·PGN 복사와 AI 시각화의 해설 표시는 로컬 자료를 사용합니다. AI 수 보기의 펼치기 버튼을 제거하고 기존 Markdown 조언을 바로 표시합니다. AI 요청 프로토콜과 사용량 정책은 변경하지 않았습니다.
+- 릴리스 버전·파일명을 0.5.2로 맞추고 태그 전용 게시 workflow의 YAML과 shell 문법, 대응 설치 안내를 확인했습니다. GitHub의 새 실행과 공개 asset 확인은 게시 후 별도로 수행합니다.
+- **새 UI의 기기 실행 검증은 미실행**입니다. 앞서 소프트웨어 에뮬레이터가 ADB에 응답하지 않았으며 과거의 기기 PASS를 이번 결과로 재사용하지 않습니다. 실제 휴대폰의 표 스크롤·수 선택·복귀와 AI 수 보기 외관은 확인이 남아 있습니다.
+
 # 0.5.1 코칭 화면·응답 경로 검증 (2026-10-08)
 
 - `testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug`: 성공. JVM **62개**, 실패/오류/스킵 0. Lint 오류 0, 경고 36. 기존 분석·인증 검사를 유지했습니다.
