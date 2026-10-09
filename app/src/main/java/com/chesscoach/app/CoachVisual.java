@@ -18,7 +18,7 @@ final class CoachVisual {
     }
     private static void trace(Chess initial,List<String> pv,boolean actual,Set<String> tokens,Map<String,Scene> scenes){
         Chess position=initial.copy();StringBuilder path=new StringBuilder();String previous=null;
-        for(int i=0;i<Math.min(6,pv.size());i++){
+        for(int i=0;i<Math.min(12,pv.size());i++){
             Chess.Move move;try{move=Chess.Move.parse(pv.get(i));}catch(IllegalArgumentException e){break;}
             if(!position.legalMoves().contains(move))break;
             String san=position.san(move);if(path.length()>0)path.append(' ');

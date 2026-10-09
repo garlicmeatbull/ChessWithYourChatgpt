@@ -1,0 +1,10 @@
+package com.chesscoach.app;
+import org.json.*;
+import org.junit.Test;
+import static org.junit.Assert.*;
+public class CoachLessonTest {
+    private JSONObject lesson()throws Exception{return new JSONObject().put("strategy","이전 전개로 중앙을 지지합니다.").put("continuation","Nf3 뒤 상대의 전개를 보고 캐슬링합니다.").put("principle","수를 두기 전 중앙과 킹 안전을 함께 확인하세요.").put("opening","전개를 마치기 전 같은 기물을 반복 이동하지 마세요.");}
+    @Test public void strategyFieldsStreamAsReadableMarkdownAtEveryBoundary()throws Exception{String json="{\"strategy\":\"중앙을 준비\",\"continuation\":\"다음 계획\"}";for(int i=0;i<=json.length();i++){String partial=CoachText.partial(json.substring(0,i));assertFalse(partial.contains("{\""));assertFalse(partial.contains("continuation\""));}assertEquals("## 지금까지의 계획\n중앙을 준비\n\n## 앞으로의 진행\n다음 계획",CoachText.partial(json));}
+    @Test public void newLessonReplacesBriefFieldsWithoutInventingSecondRequest()throws Exception{JSONObject old=new JSONObject().put("model","m").put("explanation",new JSONObject().put("headline","old").put("summary","brief"));JSONObject fresh=new JSONObject().put("model","m").put("explanation",lesson()).put("usage",new JSONObject().put("output_tokens",300));JSONObject merged=CoachText.merge(old,fresh),cache=new JSONObject().put("response",merged);assertTrue(CoachText.lesson(cache));assertTrue(CoachText.detailed(cache));assertFalse(merged.getJSONObject("explanation").has("summary"));assertTrue(CoachText.markdown(cache).contains("## 다른 대국에 적용하기"));assertEquals(300,merged.getJSONObject("usage").getInt("output_tokens"));}
+    @Test public void legacyBriefStillReadableButNotMistakenForStrategicLesson()throws Exception{JSONObject cache=new JSONObject().put("response",new JSONObject().put("explanation",new JSONObject().put("summary","이전 조언")));assertFalse(CoachText.lesson(cache));assertTrue(CoachText.markdown(cache).contains("이전 조언"));JSONObject now=new JSONObject().put("response",new JSONObject().put("explanation",lesson().put("opening","")));assertFalse(CoachText.markdown(now).contains("## 오프닝 연습"));}
+}

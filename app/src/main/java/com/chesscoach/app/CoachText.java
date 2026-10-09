@@ -4,8 +4,8 @@ import org.json.*;
 
 /** Presentation of both saved legacy explanations and incomplete streamed JSON strings. */
 public final class CoachText {
-    private static final String[] KEYS={"headline","summary","flow","bestMoveReason","plan"};
-    private static final String[] TITLES={"핵심","요약","이번 수의 판단","추천수의 근거","다음 계획"};
+    private static final String[] KEYS={"strategy","continuation","principle","opening","headline","summary","flow","bestMoveReason","plan"};
+    private static final String[] TITLES={"지금까지의 계획","앞으로의 진행","다른 대국에 적용하기","오프닝 연습","핵심","요약","이번 수의 판단","추천수의 근거","다음 계획"};
     public static String partial(String json){
         StringBuilder out=new StringBuilder();
         for(int i=0;i<KEYS.length;i++){
@@ -51,6 +51,7 @@ public final class CoachText {
     public static JSONObject merge(JSONObject previous,JSONObject incoming)throws JSONException{
         JSONObject result=new JSONObject(incoming.toString()),fresh=incoming.optJSONObject("explanation");
         if(fresh==null)return result;
+        if(fresh.has("strategy")){result.put("coachingVersion",2);return result;}
         JSONObject combined=new JSONObject();JSONObject prior=previous==null?null:previous.optJSONObject("explanation");
         if(prior!=null)for(String key:KEYS)if(prior.has(key))combined.put(key,prior.get(key));
         for(String key:KEYS)if(fresh.has(key))combined.put(key,fresh.get(key));
@@ -59,7 +60,8 @@ public final class CoachText {
         result.put(fresh.has("summary")?"summaryUsage":"detailUsage",incoming.opt("usage")==null?JSONObject.NULL:incoming.opt("usage"));
         return result;
     }
-    public static boolean detailed(JSONObject cache){JSONObject e=explanation(cache);return e!=null&&e.has("flow")&&e.has("bestMoveReason")&&e.has("plan")||cache!=null&&e==null&&!cache.optString("text").isEmpty();}
+    public static boolean lesson(JSONObject cache){JSONObject e=explanation(cache);return e!=null&&e.has("strategy")&&e.has("continuation")&&e.has("principle");}
+    public static boolean detailed(JSONObject cache){JSONObject e=explanation(cache);return lesson(cache)||e!=null&&e.has("flow")&&e.has("bestMoveReason")&&e.has("plan")||cache!=null&&e==null&&!cache.optString("text").isEmpty();}
     public static String summary(JSONObject cache){JSONObject e=explanation(cache);if(e!=null)return e.has("summary")?e.optString("summary"):shorten(e.optString("flow"));return shorten(legacy(cache==null?"":cache.optString("text")));}
     private static String shorten(String value){int end=value.indexOf('\n');if(end>=0)value=value.substring(0,end);if(value.length()<=160)return value;int n=value.offsetByCodePoints(0,Math.min(150,value.codePointCount(0,value.length())));return value.substring(0,n)+"…";}
     public static String markdown(JSONObject cache){JSONObject e=explanation(cache);if(e==null)return legacy(cache==null?"":cache.optString("text"));StringBuilder out=new StringBuilder();for(int i=0;i<KEYS.length;i++){String value=e.optString(KEYS[i]);if(value.isEmpty())continue;if(out.length()>0)out.append("\n\n");out.append("## ").append(TITLES[i]).append('\n').append(value);}return out.toString();}
