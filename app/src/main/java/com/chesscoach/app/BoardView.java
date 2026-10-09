@@ -5,7 +5,7 @@ import android.view.*;
 import java.util.*;
 import java.util.function.IntConsumer;
 public final class BoardView extends View {
-    private android.animation.ValueAnimator motion;private Chess movingBefore;private Chess.Move movingMove;private String movingAfter;private float fraction;
+    private android.animation.ValueAnimator motion;private Chess movingBefore;private Chess.Move movingMove;private char[] movingAfter;private boolean movingWhite;private float fraction;
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
     public Chess board=new Chess();public int selected=-1,lastFrom=-1,lastTo=-1,judgedSquare=-1;
     public MoveJudgment.Kind judgment=MoveJudgment.Kind.UNKNOWN;
@@ -15,11 +15,11 @@ public final class BoardView extends View {
     public void animateMove(Chess before,Chess.Move move,Chess after){
         if(motion!=null)motion.cancel();movingMove=null;
         if(!getContext().getSharedPreferences("appearance",0).getBoolean("animation",true))return;
-        movingBefore=before.copy();movingMove=move;movingAfter=after.fen();fraction=0;
+        movingBefore=before.copy();movingMove=move;movingAfter=after.squares.clone();movingWhite=after.white;fraction=0;
         android.animation.ValueAnimator next=android.animation.ValueAnimator.ofFloat(0,1);motion=next;next.setDuration(180);next.setInterpolator(new android.view.animation.DecelerateInterpolator());next.addUpdateListener(v->{fraction=(float)v.getAnimatedValue();invalidate();});next.addListener(new android.animation.AnimatorListenerAdapter(){@Override public void onAnimationEnd(android.animation.Animator a){if(motion==a){movingMove=null;motion=null;invalidate();}}});next.start();
     }
-    private boolean moving(){return movingMove!=null&&board.fen().equals(movingAfter);}
-    private boolean rookMove(){return moving()&&Character.toLowerCase(movingBefore.squares[movingMove.from()])=='k'&&Math.abs(movingMove.to()-movingMove.from())==2;}
+    private boolean moving(){return movingMove!=null&&board.white==movingWhite&&Arrays.equals(board.squares,movingAfter);}
+    private boolean rookMove(){return movingMove!=null&&Character.toLowerCase(movingBefore.squares[movingMove.from()])=='k'&&Math.abs(movingMove.to()-movingMove.from())==2;}
     private int rookFrom(){return movingMove.from()/8*8+(movingMove.to()>movingMove.from()?7:0);}
     private int rookTo(){return movingMove.from()/8*8+(movingMove.to()>movingMove.from()?5:3);}
     private void drawMoving(Canvas c,int from,int to,char piece,float tile){float x=(from%8+(to%8-from%8)*fraction)*tile,y=(7-from/8+(from/8-to/8)*fraction)*tile;PieceRenderer.draw(c,piece,x,y,tile,1);}
@@ -27,8 +27,8 @@ public final class BoardView extends View {
     /** The move that led to the displayed position; null clears starting positions. */
     public void setLastMove(Chess.Move move){lastFrom=move==null?-1:move.from();lastTo=move==null?-1:move.to();invalidate();}
     @Override protected void onMeasure(int w,int h){int height=MeasureSpec.getMode(h)==MeasureSpec.UNSPECIFIED?MeasureSpec.getSize(w):MeasureSpec.getSize(h);int size=Math.min(MeasureSpec.getSize(w),height);setMeasuredDimension(size,size);}
-    @Override protected void onDraw(Canvas c){float tile=getWidth()/8f;for(int r=0;r<8;r++)for(int f=0;f<8;f++){int s=(7-r)*8+f;float x=f*tile,y=r*tile;paint.setColor(getContext().getColor((f+r)%2==0?R.color.board_light:R.color.board_dark));c.drawRect(x,y,x+tile,y+tile,paint);if(s==lastFrom||s==lastTo){paint.setColor(0x99F4D35E);c.drawRect(x,y,x+tile,y+tile,paint);}if(s==selected){paint.setColor(0xAAE7BF45);c.drawRect(x,y,x+tile,y+tile,paint);}if(!moving()||s!=movingMove.to()&&(!rookMove()||s!=rookTo()))PieceRenderer.draw(c,board.squares[s],x,y,tile,1);if(targets.contains(s)){paint.setColor(0x882C5945);if(board.squares[s]=='.')c.drawCircle(x+tile/2,y+tile/2,tile*.11f,paint);else{paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(tile*.06f);c.drawCircle(x+tile/2,y+tile/2,tile*.43f,paint);paint.setStyle(Paint.Style.FILL);}}paint.setTypeface(Typeface.DEFAULT);paint.setTextAlign(Paint.Align.LEFT);paint.setTextSize(tile*.16f);paint.setColor((f+r)%2==0?0xFF354A49:getContext().getColor(R.color.ink));if(f==0)c.drawText(""+(8-r),x+tile*.04f,y+tile*.18f,paint);if(r==7)c.drawText(""+(char)('a'+f),x+tile*.80f,y+tile*.95f,paint);}
-        if(moving()){drawMoving(c,movingMove.from(),movingMove.to(),movingBefore.squares[movingMove.from()],tile);if(rookMove())drawMoving(c,rookFrom(),rookTo(),movingBefore.squares[rookFrom()],tile);}
+    @Override protected void onDraw(Canvas c){float tile=getWidth()/8f;boolean active=moving(),rook=active&&rookMove();int rookEnd=rook?rookTo():-1;for(int r=0;r<8;r++)for(int f=0;f<8;f++){int s=(7-r)*8+f;float x=f*tile,y=r*tile;paint.setColor(getContext().getColor((f+r)%2==0?R.color.board_light:R.color.board_dark));c.drawRect(x,y,x+tile,y+tile,paint);if(s==lastFrom||s==lastTo){paint.setColor(0x99F4D35E);c.drawRect(x,y,x+tile,y+tile,paint);}if(s==selected){paint.setColor(0xAAE7BF45);c.drawRect(x,y,x+tile,y+tile,paint);}if(!active||s!=movingMove.to()&&s!=rookEnd)PieceRenderer.draw(c,board.squares[s],x,y,tile,1);if(targets.contains(s)){paint.setColor(0x882C5945);if(board.squares[s]=='.')c.drawCircle(x+tile/2,y+tile/2,tile*.11f,paint);else{paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(tile*.06f);c.drawCircle(x+tile/2,y+tile/2,tile*.43f,paint);paint.setStyle(Paint.Style.FILL);}}paint.setTypeface(Typeface.DEFAULT);paint.setTextAlign(Paint.Align.LEFT);paint.setTextSize(tile*.16f);paint.setColor((f+r)%2==0?0xFF354A49:getContext().getColor(R.color.ink));if(f==0)c.drawText(""+(8-r),x+tile*.04f,y+tile*.18f,paint);if(r==7)c.drawText(""+(char)('a'+f),x+tile*.80f,y+tile*.95f,paint);}
+        if(active){drawMoving(c,movingMove.from(),movingMove.to(),movingBefore.squares[movingMove.from()],tile);if(rook)drawMoving(c,rookFrom(),rookTo(),movingBefore.squares[rookFrom()],tile);}
         if(playedArrow!=null&&!playedArrow.equals(recommendation))arrow(c,playedArrow,0x995B6E68,tile);if(recommendation!=null)arrow(c,recommendation,0xD24C9E43,tile);
         if(aiArrow!=null){arrow(c,aiArrow,getContext().getColor(R.color.ai),tile);aiLabel(c,aiArrow,tile);}
         if(judgedSquare>=0&&judgment!=MoveJudgment.Kind.UNKNOWN){float x=(judgedSquare%8+.80f)*tile,y=(7-judgedSquare/8+.20f)*tile;paint.setColor(judgment.color);c.drawCircle(x,y,tile*.20f,paint);paint.setColor(judgment==MoveJudgment.Kind.INACCURACY?0xFF253B2D:Color.WHITE);paint.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));paint.setTextAlign(Paint.Align.CENTER);paint.setTextSize(tile*.22f);c.drawText(judgment.symbol,x,y+tile*.075f,paint);}

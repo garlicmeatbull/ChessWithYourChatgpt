@@ -172,8 +172,9 @@ public final class Chess {
         }
         return bishops==0&&knights<=1 || knights==0;
     }
-    public String terminal(int repetitions) {
-        if(legalMoves().isEmpty())return inCheck(white)?(white?"흑 승리 · 체크메이트":"백 승리 · 체크메이트"):"무승부 · 스테일메이트";
+    public String terminal(int repetitions) {return terminal(repetitions,legalMoves());}
+    String terminal(int repetitions,List<Move> legal) {
+        if(legal.isEmpty())return inCheck(white)?(white?"흑 승리 · 체크메이트":"백 승리 · 체크메이트"):"무승부 · 스테일메이트";
         if(insufficientMaterial())return "무승부 · 기물 부족";
         if(halfmove>=100)return "무승부 · 50수 규칙 (자동 청구)";
         if(repetitions>=3)return "무승부 · 3회 반복 (자동 청구)";

@@ -154,10 +154,10 @@ public final class ReviewActivity extends ThemedActivity {
     private void requestExplanation(int ply,boolean detail,boolean foreground,boolean explicit){
         CoachMode.Ticket ticket=coachMode.admit(explicit);if(ticket==null)return;
         JSONObject saved=entry(ply);String model=Ui.model(this);JSONObject ai=cached(saved,model);Pending old=pending.get(ply);
-        if(saved==null||CoachText.visualLesson(ai))return;
+        if(saved==null||CoachPreferences.matches(ai,CoachPreferences.read(this)))return;
         if(old!=null&&model.equals(old.model)&&(!foreground||old.foreground||old.running))return;
         if(!ChatGptAccounts.connected(this))return;
-        JSONObject payload;try{payload=new JSONObject(saved.getJSONObject("payload").toString());payload.put("model",model).put("detail",detail);JSONArray hs=records.find(recordId).highlights();for(int i=0;i<hs.length();i++){JSONObject f=hs.getJSONObject(i);if(f.getInt("ply")==ply)payload.put("learningFocus",f.getString("focus"));}}catch(Exception e){return;}
+        JSONObject payload;try{payload=new JSONObject(saved.getJSONObject("payload").toString());payload.put("model",model).put("detail",detail).put("coachPreferences",CoachPreferences.read(this).json());JSONArray hs=records.find(recordId).highlights();for(int i=0;i<hs.length();i++){JSONObject f=hs.getJSONObject(i);if(f.getInt("ply")==ply)payload.put("learningFocus",f.getString("focus"));}}catch(Exception e){return;}
         Pending job=new Pending(model,detail,foreground,ticket);pending.put(ply,job);renderFeedback();
         coachJobs.submit(()->{if(destroyed||pending.get(ply)!=job)return;job.running=true;if(!coachMode.mayStart(ticket)){runOnUiThread(()->{pending.remove(ply,job);if(!destroyed)renderFeedback();});return;}try{
             var snapshot=records.find(recordId);if(snapshot==null)throw new java.io.IOException("삭제된 대국입니다.");JSONObject contextual=CoachContext.attach(payload,game,ply+1,GameSession.playerWhite(game),snapshot.analyses());

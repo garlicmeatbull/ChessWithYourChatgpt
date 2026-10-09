@@ -1,3 +1,13 @@
+# 0.6.2 사용자 프롬프트·대국 반응 검증 (2026-10-09)
+
+- `testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug`: 성공. JVM **86개**, 실패/오류/스킵 0. Lint 오류 0, 경고 36. 앱과 instrumentation APK 빌드 성공.
+- `scripts/test-core.sh app/build/stockfish/host/src/stockfish`: 실제 호스트 Stockfish 포함 **54개** 통과. perft·SAN·PGN·무승부·앙파상·캐슬링·난이도·블런더/희생 후보와 분석 엔진 독립성을 확인했습니다.
+- 새 JVM 검사: 요약/초보자 옵션별 캐시 구분, 추가 프롬프트 보존·2,000자 제한·정규화·JSON 왕복, 이전 캐시 표시와 설정 일치 재사용, 캐시된 합법 수의 종료 판정, Sol 우선/계정 제공 목록/직접 선택 우선.
+- 상대 애니메이션/분석 중 즉시 선택과 백그라운드 기록의 최신 합법 수순 보존 instrumentation을 추가하고 컴파일했습니다. **기기 실행은 미실행**입니다. 클라우드 에뮬레이터는 ADB 응답 문제가 있어 과거 PASS를 새 버전 결과로 사용하지 않습니다.
+- 기록은 착수한 SAN/국면을 재사용하고 순서대로 비동기 저장합니다. 최초 기록 생성·포인터 커밋은 동기이며 다음 AI의 기록 조회는 선행 저장 완료를 UI 밖에서 기다립니다. 종료 때 접수한 저장 작업은 배출하며 반복적인 UI의 전체 분석 캐시 조회를 제거했습니다.
+- 기물 벡터 도형 재사용, 불투명 레이어 제거, 프레임당 이동 상태 확인으로 반복 할당을 줄였습니다. Stockfish 검색 시간·강도는 바꾸지 않았으며 흑의 `...`/`…` 정식 표기도 유지했습니다.
+- **실제 휴대폰의 FPS·터치 지연 수치, 새 설정 화면 외관, 실제 계정의 프롬프트 준수/토큰 사용량은 측정하지 않았습니다.** 모든 렉이 해소됐다고 주장하지 않습니다. 새 의존성은 없으며 기존 라이선스와 대응 소스 제공을 유지합니다.
+
 # 0.6.1 문단별 실시간 시각화 검증 (2026-10-09)
 
 - `testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug`: 성공. JVM **81개**, 실패/오류/스킵 0. Lint 오류 0, 경고 36. 앱과 instrumentation APK 빌드 성공.

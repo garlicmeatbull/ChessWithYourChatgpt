@@ -78,3 +78,15 @@ CoachDiagrams produces stable a/c/n IDs for verified played, alternative and aft
 CoachVisualDialog.Live is updated by CoachPanel.visuals for each selected-position stream. It reuses text/board blocks, puts diagrams after the associated explanation and never scrolls back to the first board on a text update. CoachScroll coalesces pending text/layout mutations while dragging/flinging, then applies the latest complete snapshot after a 220ms scroll quiet period. Static Markdown patterns and unchanged-text checks reduce allocations. The stream presentation cadence is 180ms; final saved output is authoritative. Main/review cache the diagram catalog by position/engine details and avoid rereading the record for each delta. Popups close on position/model identity changes and activity destruction.
 
 Responses add visualVersion=1. Older strategic responses remain readable; an explicitly requested or enabled automatic coaching refresh can generate the annotation-capable format. Account/model isolation, auto/manual policy and usage storage remain unchanged. No additional model call or external dependency is introduced for drawing.
+
+## 0.6.2 설명 설정·입력·그리기
+
+`SettingsActivity`가 기존 Appearance 선택과 AI 프롬프트 설정을 제공합니다. `CoachPreferences.Options`는 요약·초보자 옵션과 최대 2,000자의 추가 요청을 각 모델 요청 시작 시 스냅샷으로 고정합니다. 옵션은 같은 단일 Responses 요청의 설명 지침에 추가되며 엔진 근거/JSON/시각화 프로토콜은 유지합니다. 응답에 SHA-256 설정 식별자를 저장해 설정이 다른 캐시를 다음 요청에서 재사용하지 않습니다. 설정 자체로 호출하지 않으며 기존 텍스트 표시와 모델별 저장은 유지합니다.
+
+모델 추천은 제공된 목록의 `gpt-6-sol`을 우선합니다. `preferredModel`에 직접 선택이 있으면 존중하고 없을 때 이전 자동 기본값을 새 추천으로 바꿉니다. 사용할 수 없는 모델을 임의 요청하지 않습니다.
+
+`MainActivity`는 실제 착수마다 `Pgn.Ply`를 한 번 생성해 유지하고 무르기 때 함께 자릅니다. SAN을 다시 계산해 전체 PGN을 재생하던 경로와 분석 갱신마다 기보 버튼을 재생성하던 경로를 제거했습니다. `recordJobs`는 PGN/분석 스냅샷 쓰기를 순서대로 처리하고 `onStop`에서도 최신 스냅샷을 접수하며 종료 시 이미 접수된 작업을 배출합니다. 완성된 AI 해설은 기존 계정·모델별 SQLite 저장을 사용합니다. 최초 기록과 activeRecord 포인터는 기존처럼 디스크 커밋 후 사용합니다. AI 맥락 조회는 저장 큐의 선행 작업 완료를 UI 밖에서 기다립니다.
+
+입력 대기는 사람의 수를 분석하고 상대 응수를 준비할 때에 적용합니다. 상대 착수 뒤의 분석은 사람의 선택과 동시에 진행할 수 있으며 오래된 분석 완료는 최신 착수의 busy 상태를 해제하지 않습니다. Stockfish 검색 시간/후보 수는 유지합니다. 같은 국면의 합법 수와 종료 판정을 재사용합니다.
+
+`PieceRenderer`는 불변 벡터 Path를 초기화 때 만들어 재사용하고 불투명 기물에는 saveLayerAlpha를 만들지 않습니다. `BoardView`는 프레임당 한 번만 이동 상태를 확인하고 FEN 대신 기물 배열/차례를 비교합니다. 실제 폰의 FPS나 ANR 개선율은 클라우드 빌드만으로 확인할 수 없습니다.

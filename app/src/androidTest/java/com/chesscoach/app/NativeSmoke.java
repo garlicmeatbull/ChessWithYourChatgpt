@@ -15,7 +15,7 @@ public final class NativeSmoke extends Instrumentation {
             @Override public android.content.SharedPreferences getSharedPreferences(String name,int mode){return super.getSharedPreferences("instrumentation-"+name,mode);}
         };
         try{
-            if(modeOnly){if(uiOnly){sessionChecks();playChecks();}modeChecks();if(uiOnly)visualChecks();result.putString("result","PASS");result.putInt("checks",checks);java.nio.file.Files.write(new java.io.File(getTargetContext().getExternalFilesDir(null),"native-ui-result.txt").toPath(),("PASS checks="+checks).getBytes(java.nio.charset.StandardCharsets.UTF_8));finish(-1,result);return;}
+            if(modeOnly){if(uiOnly){sessionChecks();playChecks();responsivePlayChecks();}modeChecks();if(uiOnly)visualChecks();result.putString("result","PASS");result.putInt("checks",checks);java.nio.file.Files.write(new java.io.File(getTargetContext().getExternalFilesDir(null),"native-ui-result.txt").toPath(),("PASS checks="+checks).getBytes(java.nio.charset.StandardCharsets.UTF_8));finish(-1,result);return;}
             coachChecks();
             if(coachOnly){result.putString("result","PASS");result.putInt("checks",checks);finish(-1,result);return;}
             Pgn.Game game=Pgn.parse("1. e4 e5 2. Nf3 Nc6 *");
@@ -101,6 +101,14 @@ public final class NativeSmoke extends Instrumentation {
         }finally{
             if(activity[0]!=null){runOnMainSync(()->activity[0].finish());waitForIdleSync();}db.delete(id);var edit=prefs.edit();for(var entry:backup.entrySet()){Object value=entry.getValue();if(value==null)edit.remove(entry.getKey());else if(value instanceof Long number)edit.putLong(entry.getKey(),number);else if(value instanceof Boolean flag)edit.putBoolean(entry.getKey(),flag);else edit.putString(entry.getKey(),value.toString());}edit.commit();if(oldTheme==null)appearance.edit().remove("theme").commit();else appearance.edit().putString("theme",oldTheme).commit();
         }
+    }
+    private void responsivePlayChecks()throws Exception {
+        var prefs=getTargetContext().getSharedPreferences("coach",0);Object active=prefs.getAll().get("activeRecord"),automatic=prefs.getAll().get("autoCoach");Records records=Records.get(getTargetContext());long id=records.create("instrumentation responsive play","played",Pgn.parse("1. e4 e5 *"));records.patch(id,1,new JSONObject().put("details",new JSONObject()));android.app.Activity[] activity={null};
+        try{prefs.edit().putBoolean("autoCoach",false).commit();activity[0]=startActivitySync(new android.content.Intent(getTargetContext(),MainActivity.class).putExtra("resumeRecord",id).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));awaitBoard(activity[0]);
+            var play=MainActivity.class.getDeclaredMethod("play",Chess.Move.class,int.class,boolean.class);play.setAccessible(true);var select=MainActivity.class.getDeclaredMethod("select",int.class);select.setAccessible(true);var generation=MainActivity.class.getDeclaredField("generation");generation.setAccessible(true);var writer=MainActivity.class.getDeclaredField("recordJobs");writer.setAccessible(true);
+            runOnMainSync(()->{try{int epoch=generation.getInt(activity[0]);play.invoke(activity[0],Chess.Move.parse("g1f3"),epoch,false);play.invoke(activity[0],Chess.Move.parse("b8c6"),epoch,true);select.invoke(activity[0],1);var board=(BoardView)type(activity[0].getWindow().getDecorView(),BoardView.class);check(board.selected==1&&board.targets.contains(18),"player selects immediately during opponent animation and analysis");}catch(ReflectiveOperationException e){throw new AssertionError(e);}});
+            ((java.util.concurrent.ExecutorService)writer.get(activity[0])).submit(()->{}).get(10,java.util.concurrent.TimeUnit.SECONDS);var stored=Pgn.parse(records.find(id).pgn());check(stored.plies().size()==4&&stored.plies().get(3).uci().equals("b8c6"),"background writer stores the latest complete legal move sequence");
+        }finally{if(activity[0]!=null){runOnMainSync(()->activity[0].finish());waitForIdleSync();}records.delete(id);var edit=prefs.edit();if(active instanceof Long value)edit.putLong("activeRecord",value);else edit.remove("activeRecord");if(automatic instanceof Boolean value)edit.putBoolean("autoCoach",value);else edit.remove("autoCoach");edit.commit();}
     }
     private void modeChecks()throws Exception {
         var prefs=getTargetContext().getSharedPreferences("coach",0);boolean existed=prefs.contains("autoCoach"),old=prefs.getBoolean("autoCoach",false);
