@@ -44,7 +44,12 @@ jobs:
       - name: Rules, PGN and engine checks
         run: bash scripts/test-core.sh app/build/stockfish/host/src/stockfish
       - name: Build and lint
-        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug
+        run: |
+          set -o pipefail
+          if ! ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug 2>&1 | tee /tmp/chess-build.log; then
+            { echo '### Android build failure'; echo '```text'; tail -100 /tmp/chess-build.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
       - name: Corresponding source with NNUE
         run: |
           python3 scripts/package-source.py
